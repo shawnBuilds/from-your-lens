@@ -277,7 +277,7 @@ var BatchCompareForm = function(param) {
     useEffect(function() {
         var processDrivePhotos = /*#__PURE__*/ function() {
             var _ref = _async_to_generator(function() {
-                var newTargetFiles, newTargetPreviewUrlsData, newDisplayableItems, newTargetImageDimensionsListData, hasOverallError, i, photo, photoIdentifier, blob, fileTypeFromMeta, fileExtension, finalMimeType, subtype, subtype1, fileName, currentExt, file, previewUrl, err;
+                var newTargetFiles, newTargetPreviewUrlsData, newDisplayableItems, newTargetImageDimensionsListData, hasOverallError, i, photo, photoIdentifier, blob, response, fileTypeFromMeta, fileExtension, finalMimeType, subtype, subtype1, fileName, currentExt, file, previewUrl, err;
                 return _ts_generator(this, function(_state) {
                     switch(_state.label){
                         case 0:
@@ -315,7 +315,7 @@ var BatchCompareForm = function(param) {
                         case 1:
                             if (!(i < targetPhotosFromDrive.length)) return [
                                 3,
-                                8
+                                11
                             ];
                             photo = targetPhotosFromDrive[i];
                             photoIdentifier = photo.name || photo.id || "image-".concat(i);
@@ -332,36 +332,58 @@ var BatchCompareForm = function(param) {
                                 // Not adding to newTargetFiles as it's not a valid file for submission
                                 return [
                                     3,
-                                    7
+                                    10
                                 ];
                             }
                             _state.label = 2;
                         case 2:
                             _state.trys.push([
                                 2,
-                                6,
+                                9,
                                 ,
-                                7
+                                10
                             ]);
                             blob = void 0;
+                            if (!photo.src) return [
+                                3,
+                                5
+                            ];
+                            return [
+                                4,
+                                fetch(photo.src)
+                            ];
+                        case 3:
+                            response = _state.sent();
+                            if (!response.ok) throw new Error("HTTP error! status: ".concat(response.status));
+                            return [
+                                4,
+                                response.blob()
+                            ];
+                        case 4:
+                            blob = _state.sent();
+                            return [
+                                3,
+                                8
+                            ];
+                        case 5:
                             if (!(preloadedImageBlobs && preloadedImageBlobs.has(photo.id))) return [
                                 3,
-                                3
+                                6
                             ];
                             blob = preloadedImageBlobs.get(photo.id);
                             return [
                                 3,
-                                5
+                                8
                             ];
-                        case 3:
+                        case 6:
                             return [
                                 4,
                                 fetchImageBlob(photo.id)
                             ];
-                        case 4:
+                        case 7:
                             blob = _state.sent();
-                            _state.label = 5;
-                        case 5:
+                            _state.label = 8;
+                        case 8:
                             fileTypeFromMeta = photo.mimeType;
                             fileExtension = 'jpg';
                             finalMimeType = blob.type;
@@ -403,9 +425,9 @@ var BatchCompareForm = function(param) {
                             });
                             return [
                                 3,
-                                7
+                                10
                             ];
-                        case 6:
+                        case 9:
                             err = _state.sent();
                             console.error("[BatchCompareForm] Failed to fetch/process Drive photo ".concat(photo.id, " (name: ").concat(photo.name, "):"), err);
                             newTargetFiles.push({
@@ -426,15 +448,15 @@ var BatchCompareForm = function(param) {
                             }
                             return [
                                 3,
-                                7
+                                10
                             ];
-                        case 7:
+                        case 10:
                             i++;
                             return [
                                 3,
                                 1
                             ];
-                        case 8:
+                        case 11:
                             setTargetFiles(newTargetFiles);
                             setTargetPreviewUrls(newTargetPreviewUrlsData); // Update this for results carousel
                             setDisplayableTargetImages(newDisplayableItems);
@@ -959,6 +981,28 @@ var BatchCompareForm = function(param) {
                         }
                         setInternalIsLoading(true); // Indicate processing
                         if (onError) onError(null); // Clear previous errors
+                        // --- Mock User Logic ---
+                        if (userId === 'mock-user-01') {
+                            console.log("[BatchCompareForm Mock] User ".concat(userId, " is confirming ").concat(memoizedMatchingData.results.length, " matched photos."));
+                            memoizedMatchingData.originalIndices.forEach(function(originalIndex) {
+                                var photoToUpdate = targetPhotosFromDrive[originalIndex];
+                                if (photoToUpdate && photoToUpdate.id && updateSinglePhotoMetadata) {
+                                    console.log("  - [Mock] Tagging photo ".concat(photoToUpdate.id, " as photo of mock user."));
+                                    // Simulate the data structure the backend would return.
+                                    var simulatedUpdatedPhoto = _object_spread_props(_object_spread({}, photoToUpdate), {
+                                        photo_of: userId
+                                    });
+                                    updateSinglePhotoMetadata(simulatedUpdatedPhoto);
+                                }
+                            });
+                            console.log("[BatchCompareForm Mock] Finished mock-updating 'photoOf'. Closing modal.");
+                            setInternalIsLoading(false);
+                            onClose();
+                            return [
+                                2
+                            ]; // End execution for mock user
+                        }
+                        // --- Real User Logic (unchanged) ---
                         console.log("[BatchCompareForm] User ".concat(userId, " is confirming ").concat(memoizedMatchingData.results.length, " matched photos. Attempting to update 'photoOf'."));
                         successfulUpdates = 0;
                         failedUpdates = 0;
@@ -993,7 +1037,7 @@ var BatchCompareForm = function(param) {
                         console.log("    Successfully updated photoOf for ".concat(photo.id, "."));
                         successfulUpdates++;
                         if (updatedPhoto && updateSinglePhotoMetadata) {
-                            console.log("    Calling updateSinglePhotoMetadata for ".concat(updatedPhoto.drive_file_id, "."));
+                            console.log("    Calling updateSinglePhotoMetadata for ".concat(updatedPhoto.id, "."));
                             updateSinglePhotoMetadata(updatedPhoto);
                         } else if (!updatedPhoto) {
                             console.warn("    photoService.updatePhotoSubject for ".concat(photo.id, " did not return updated photo data. UI state for this photo might not refresh immediately."));
@@ -1006,7 +1050,6 @@ var BatchCompareForm = function(param) {
                         err = _state.sent();
                         console.error("    Failed to update photoOf for ".concat(photo.id, ":"), err);
                         failedUpdates++;
-                        // Optionally, report the first error to the UI
                         if (onError && failedUpdates === 1) {
                             onError('Failed to update "'.concat(photo.name || photo.id, '" as a photo of you. Other updates may continue. Error: ').concat(err.message));
                         }
@@ -1021,7 +1064,7 @@ var BatchCompareForm = function(param) {
                         ];
                     case 6:
                         console.warn("  - Could not update photoOf at originalIndex ".concat(originalIndex, ", missing photo data or ID."));
-                        failedUpdates++; // Count this as a failure for reporting
+                        failedUpdates++;
                         _state.label = 7;
                     case 7:
                         i++;
@@ -1033,20 +1076,13 @@ var BatchCompareForm = function(param) {
                         setInternalIsLoading(false);
                         console.log("[BatchCompareForm] Finished updating 'photoOf' for all confirmed matches. Successful: ".concat(successfulUpdates, ", Failed: ").concat(failedUpdates, "."));
                         if (failedUpdates > 0 && successfulUpdates === 0) {
-                            // If all failed, keep the modal open and show the last error (or first if reported earlier)
                             if (onError && !onError) {
                                 onError("Could not update 'photo of you' for any of the ".concat(memoizedMatchingData.results.length, " photos. Please check logs."));
                             }
-                        // Do not close if all failed, let user see error.
                         } else {
                             if (failedUpdates > 0 && onError) {
-                            // If some failed, the error for the first one is already set.
-                            // We might add a more general "Some updates failed" message or rely on the first error shown.
-                            // For now, we'll close, assuming the first error gave enough info.
+                            // Error for the first failure is already set.
                             }
-                            // Close the modal if at least one update was successful, or if there were no updates to attempt.
-                            // The `onResults` callback isn't strictly necessary here unless the parent needs to react
-                            // to the confirmation itself, beyond just the form closing.
                             onClose();
                         }
                         return [
@@ -1075,10 +1111,10 @@ var BatchCompareForm = function(param) {
                     children: [
                         /*#__PURE__*/ _jsxDEV("h2", {
                             className: "modal-title-container",
-                            children: title
+                            children: "Find Photos of You"
                         }, void 0, false, {
                             fileName: "BatchCompareForm.jsx",
-                            lineNumber: 520,
+                            lineNumber: 537,
                             columnNumber: 9
                         }, _this),
                         /*#__PURE__*/ _jsxDEV("button", {
@@ -1089,13 +1125,13 @@ var BatchCompareForm = function(param) {
                             children: "\xd7"
                         }, void 0, false, {
                             fileName: "BatchCompareForm.jsx",
-                            lineNumber: 521,
+                            lineNumber: 538,
                             columnNumber: 9
                         }, _this)
                     ]
                 }, void 0, true, {
                     fileName: "BatchCompareForm.jsx",
-                    lineNumber: 519,
+                    lineNumber: 536,
                     columnNumber: 7
                 }, _this),
                 /*#__PURE__*/ _jsxDEV("div", {
@@ -1126,7 +1162,7 @@ var BatchCompareForm = function(param) {
                                                     children: "Photo of You"
                                                 }, void 0, false, {
                                                     fileName: "BatchCompareForm.jsx",
-                                                    lineNumber: 535,
+                                                    lineNumber: 552,
                                                     columnNumber: 15
                                                 }, _this),
                                                 !isSourceSetByProp ? // Manual selection mode
@@ -1143,7 +1179,7 @@ var BatchCompareForm = function(param) {
                                                                     children: sourcePreviewUrl ? "Change Source File" : "Choose Source File"
                                                                 }, void 0, false, {
                                                                     fileName: "BatchCompareForm.jsx",
-                                                                    lineNumber: 541,
+                                                                    lineNumber: 558,
                                                                     columnNumber: 21
                                                                 }, _this),
                                                                 !sourcePreviewUrl && /*#__PURE__*/ _jsxDEV("span", {
@@ -1151,13 +1187,13 @@ var BatchCompareForm = function(param) {
                                                                     children: sourceFile ? sourceFile.name : 'No file selected'
                                                                 }, void 0, false, {
                                                                     fileName: "BatchCompareForm.jsx",
-                                                                    lineNumber: 545,
+                                                                    lineNumber: 562,
                                                                     columnNumber: 23
                                                                 }, _this)
                                                             ]
                                                         }, void 0, true, {
                                                             fileName: "BatchCompareForm.jsx",
-                                                            lineNumber: 540,
+                                                            lineNumber: 557,
                                                             columnNumber: 19
                                                         }, _this),
                                                         /*#__PURE__*/ _jsxDEV("input", {
@@ -1172,13 +1208,13 @@ var BatchCompareForm = function(param) {
                                                             disabled: internalIsLoading
                                                         }, void 0, false, {
                                                             fileName: "BatchCompareForm.jsx",
-                                                            lineNumber: 551,
+                                                            lineNumber: 568,
                                                             columnNumber: 19
                                                         }, _this)
                                                     ]
                                                 }, void 0, true, {
                                                     fileName: "BatchCompareForm.jsx",
-                                                    lineNumber: 539,
+                                                    lineNumber: 556,
                                                     columnNumber: 17
                                                 }, _this) : // Prop selection mode
                                                 // Show loading/error message ONLY if no preview is available yet
@@ -1198,17 +1234,17 @@ var BatchCompareForm = function(param) {
                                                             children: internalIsLoading ? 'Loading profile image...' : sourceFile ? sourceFile.name : 'Failed to load profile image.'
                                                         }, void 0, false, {
                                                             fileName: "BatchCompareForm.jsx",
-                                                            lineNumber: 567,
+                                                            lineNumber: 584,
                                                             columnNumber: 23
                                                         }, _this)
                                                     }, void 0, false, {
                                                         fileName: "BatchCompareForm.jsx",
-                                                        lineNumber: 566,
+                                                        lineNumber: 583,
                                                         columnNumber: 21
                                                     }, _this)
                                                 }, void 0, false, {
                                                     fileName: "BatchCompareForm.jsx",
-                                                    lineNumber: 565,
+                                                    lineNumber: 582,
                                                     columnNumber: 19
                                                 }, _this),
                                                 sourcePreviewUrl && /*#__PURE__*/ _jsxDEV("div", {
@@ -1231,23 +1267,23 @@ var BatchCompareForm = function(param) {
                                                             }
                                                         }, void 0, false, {
                                                             fileName: "BatchCompareForm.jsx",
-                                                            lineNumber: 582,
+                                                            lineNumber: 599,
                                                             columnNumber: 21
                                                         }, _this)
                                                     }, void 0, false, {
                                                         fileName: "BatchCompareForm.jsx",
-                                                        lineNumber: 581,
+                                                        lineNumber: 598,
                                                         columnNumber: 19
                                                     }, _this)
                                                 }, void 0, false, {
                                                     fileName: "BatchCompareForm.jsx",
-                                                    lineNumber: 577,
+                                                    lineNumber: 594,
                                                     columnNumber: 17
                                                 }, _this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "BatchCompareForm.jsx",
-                                            lineNumber: 534,
+                                            lineNumber: 551,
                                             columnNumber: 13
                                         }, _this),
                                         /*#__PURE__*/ _jsxDEV("div", {
@@ -1273,30 +1309,30 @@ var BatchCompareForm = function(param) {
                                                             children: image.errorMessage || 'Failed to load'
                                                         }, void 0, false, {
                                                             fileName: "BatchCompareForm.jsx",
-                                                            lineNumber: 616,
+                                                            lineNumber: 633,
                                                             columnNumber: 40
                                                         }, void 0)
                                                     }, void 0, false, {
                                                         fileName: "BatchCompareForm.jsx",
-                                                        lineNumber: 614,
+                                                        lineNumber: 631,
                                                         columnNumber: 19
                                                     }, void 0);
                                                 },
                                                 className: "target-previews-input-carousel"
                                             }, void 0, false, {
                                                 fileName: "BatchCompareForm.jsx",
-                                                lineNumber: 604,
+                                                lineNumber: 621,
                                                 columnNumber: 15
                                             }, _this)
                                         }, void 0, false, {
                                             fileName: "BatchCompareForm.jsx",
-                                            lineNumber: 603,
+                                            lineNumber: 620,
                                             columnNumber: 13
                                         }, _this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "BatchCompareForm.jsx",
-                                    lineNumber: 532,
+                                    lineNumber: 549,
                                     columnNumber: 11
                                 }, _this),
                                 " ",
@@ -1317,7 +1353,7 @@ var BatchCompareForm = function(param) {
                                     children: internalIsLoading ? 'Comparing...' : isPreparingTargets ? 'Preparing Targets...' : 'Find Photos of You'
                                 }, void 0, false, {
                                     fileName: "BatchCompareForm.jsx",
-                                    lineNumber: 623,
+                                    lineNumber: 640,
                                     columnNumber: 11
                                 }, _this),
                                 internalIsLoading && /*#__PURE__*/ _jsxDEV("div", {
@@ -1334,12 +1370,12 @@ var BatchCompareForm = function(param) {
                                         "aria-valuemax": "100"
                                     }, void 0, false, {
                                         fileName: "BatchCompareForm.jsx",
-                                        lineNumber: 634,
+                                        lineNumber: 651,
                                         columnNumber: 15
                                     }, _this)
                                 }, void 0, false, {
                                     fileName: "BatchCompareForm.jsx",
-                                    lineNumber: 633,
+                                    lineNumber: 650,
                                     columnNumber: 13
                                 }, _this),
                                 memoizedMatchingData.previewUrls.length > 0 && /*#__PURE__*/ _jsxDEV("div", {
@@ -1354,7 +1390,7 @@ var BatchCompareForm = function(param) {
                                             children: "Matching Images"
                                         }, void 0, false, {
                                             fileName: "BatchCompareForm.jsx",
-                                            lineNumber: 648,
+                                            lineNumber: 665,
                                             columnNumber: 17
                                         }, _this),
                                         /*#__PURE__*/ _jsxDEV("div", {
@@ -1371,12 +1407,12 @@ var BatchCompareForm = function(param) {
                                                         alt: "Previous"
                                                     }, void 0, false, {
                                                         fileName: "BatchCompareForm.jsx",
-                                                        lineNumber: 657,
+                                                        lineNumber: 674,
                                                         columnNumber: 21
                                                     }, _this)
                                                 }, void 0, false, {
                                                     fileName: "BatchCompareForm.jsx",
-                                                    lineNumber: 650,
+                                                    lineNumber: 667,
                                                     columnNumber: 19
                                                 }, _this),
                                                 /*#__PURE__*/ _jsxDEV("div", {
@@ -1387,66 +1423,79 @@ var BatchCompareForm = function(param) {
                                                         var currentMatchingDimension = memoizedMatchingData.dimensions[currentDisplayIndex];
                                                         var currentOriginalIndex = memoizedMatchingData.originalIndices[currentDisplayIndex];
                                                         return /*#__PURE__*/ _jsxDEV(_Fragment, {
-                                                            children: /*#__PURE__*/ _jsxDEV("img", {
-                                                                src: memoizedMatchingData.previewUrls[currentDisplayIndex],
-                                                                alt: "Matching Target ".concat(currentDisplayIndex + 1, ": ").concat((currentMatchingFile === null || currentMatchingFile === void 0 ? void 0 : currentMatchingFile.name) || ''),
-                                                                onLoad: function(e) {
-                                                                    if (typeof currentOriginalIndex === 'number') {
-                                                                        var img = e.target;
-                                                                        var naturalWidth = img.naturalWidth;
-                                                                        var naturalHeight = img.naturalHeight;
-                                                                        var containerWidth = img.offsetWidth;
-                                                                        var containerHeight = img.offsetHeight;
-                                                                        var displayWidth = containerWidth;
-                                                                        var displayHeight = containerHeight;
-                                                                        var offsetX = 0;
-                                                                        var offsetY = 0;
-                                                                        if (naturalWidth > 0 && naturalHeight > 0) {
-                                                                            var naturalAspectRatio = naturalWidth / naturalHeight;
-                                                                            var containerAspectRatio = containerWidth / containerHeight;
-                                                                            if (naturalAspectRatio > containerAspectRatio) {
-                                                                                // Image is wider than container, letterboxed top/bottom
-                                                                                displayWidth = containerWidth;
-                                                                                displayHeight = containerWidth / naturalAspectRatio;
-                                                                                offsetY = (containerHeight - displayHeight) / 2;
+                                                            children: [
+                                                                /*#__PURE__*/ _jsxDEV("img", {
+                                                                    src: memoizedMatchingData.previewUrls[currentDisplayIndex],
+                                                                    alt: "Matching Target ".concat(currentDisplayIndex + 1, ": ").concat((currentMatchingFile === null || currentMatchingFile === void 0 ? void 0 : currentMatchingFile.name) || ''),
+                                                                    onLoad: function(e) {
+                                                                        if (typeof currentOriginalIndex === 'number') {
+                                                                            var img = e.target;
+                                                                            var naturalWidth = img.naturalWidth;
+                                                                            var naturalHeight = img.naturalHeight;
+                                                                            var containerWidth = img.offsetWidth;
+                                                                            var containerHeight = img.offsetHeight;
+                                                                            var displayWidth = containerWidth;
+                                                                            var displayHeight = containerHeight;
+                                                                            var offsetX = 0;
+                                                                            var offsetY = 0;
+                                                                            if (naturalWidth > 0 && naturalHeight > 0) {
+                                                                                var naturalAspectRatio = naturalWidth / naturalHeight;
+                                                                                var containerAspectRatio = containerWidth / containerHeight;
+                                                                                if (naturalAspectRatio > containerAspectRatio) {
+                                                                                    // Image is wider than container, letterboxed top/bottom
+                                                                                    displayWidth = containerWidth;
+                                                                                    displayHeight = containerWidth / naturalAspectRatio;
+                                                                                    offsetY = (containerHeight - displayHeight) / 2;
+                                                                                } else {
+                                                                                    // Image is taller or same aspect, letterboxed left/right
+                                                                                    displayHeight = containerHeight;
+                                                                                    displayWidth = containerHeight * naturalAspectRatio;
+                                                                                    offsetX = (containerWidth - displayWidth) / 2;
+                                                                                }
                                                                             } else {
-                                                                                // Image is taller or same aspect, letterboxed left/right
+                                                                                // If natural dimensions are zero, use container dimensions with no offset
+                                                                                // This might not be perfect but prevents errors.
+                                                                                displayWidth = containerWidth;
                                                                                 displayHeight = containerHeight;
-                                                                                displayWidth = containerHeight * naturalAspectRatio;
-                                                                                offsetX = (containerWidth - displayWidth) / 2;
                                                                             }
-                                                                        } else {
-                                                                            // If natural dimensions are zero, use container dimensions with no offset
-                                                                            // This might not be perfect but prevents errors.
-                                                                            displayWidth = containerWidth;
-                                                                            displayHeight = containerHeight;
+                                                                            var newFullDimensionsList = _to_consumable_array(targetImageDimensionsList);
+                                                                            newFullDimensionsList[currentOriginalIndex] = {
+                                                                                width: displayWidth,
+                                                                                height: displayHeight,
+                                                                                offsetX: offsetX,
+                                                                                offsetY: offsetY
+                                                                            };
+                                                                            setTargetImageDimensionsList(newFullDimensionsList);
                                                                         }
-                                                                        var newFullDimensionsList = _to_consumable_array(targetImageDimensionsList);
-                                                                        newFullDimensionsList[currentOriginalIndex] = {
-                                                                            width: displayWidth,
-                                                                            height: displayHeight,
-                                                                            offsetX: offsetX,
-                                                                            offsetY: offsetY
-                                                                        };
-                                                                        setTargetImageDimensionsList(newFullDimensionsList);
                                                                     }
-                                                                }
-                                                            }, void 0, false, {
-                                                                fileName: "BatchCompareForm.jsx",
-                                                                lineNumber: 668,
-                                                                columnNumber: 27
-                                                            }, _this)
-                                                        }, void 0, false);
+                                                                }, void 0, false, {
+                                                                    fileName: "BatchCompareForm.jsx",
+                                                                    lineNumber: 685,
+                                                                    columnNumber: 27
+                                                                }, _this),
+                                                                /*#__PURE__*/ _jsxDEV("button", {
+                                                                    type: "button",
+                                                                    onClick: handleRejectImage,
+                                                                    className: "carousel-reject-button",
+                                                                    "aria-label": "Reject Image",
+                                                                    children: "\xd7"
+                                                                }, void 0, false, {
+                                                                    fileName: "BatchCompareForm.jsx",
+                                                                    lineNumber: 731,
+                                                                    columnNumber: 28
+                                                                }, _this)
+                                                            ]
+                                                        }, void 0, true);
                                                     }() : /*#__PURE__*/ _jsxDEV("span", {
                                                         children: "Loading image..."
                                                     }, void 0, false, {
                                                         fileName: "BatchCompareForm.jsx",
-                                                        lineNumber: 732,
+                                                        lineNumber: 757,
                                                         columnNumber: 23
                                                     }, _this)
                                                 }, void 0, false, {
                                                     fileName: "BatchCompareForm.jsx",
-                                                    lineNumber: 660,
+                                                    lineNumber: 677,
                                                     columnNumber: 19
                                                 }, _this),
                                                 /*#__PURE__*/ _jsxDEV("button", {
@@ -1460,59 +1509,19 @@ var BatchCompareForm = function(param) {
                                                         alt: "Next"
                                                     }, void 0, false, {
                                                         fileName: "BatchCompareForm.jsx",
-                                                        lineNumber: 742,
+                                                        lineNumber: 767,
                                                         columnNumber: 21
                                                     }, _this)
                                                 }, void 0, false, {
                                                     fileName: "BatchCompareForm.jsx",
-                                                    lineNumber: 735,
+                                                    lineNumber: 760,
                                                     columnNumber: 19
                                                 }, _this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "BatchCompareForm.jsx",
-                                            lineNumber: 649,
+                                            lineNumber: 666,
                                             columnNumber: 17
-                                        }, _this),
-                                        memoizedMatchingData.previewUrls.length > 0 && memoizedMatchingData.previewUrls[currentDisplayIndex] && memoizedMatchingData.files[currentDisplayIndex] && /*#__PURE__*/ _jsxDEV("div", {
-                                            style: {
-                                                display: 'flex',
-                                                justifyContent: 'center',
-                                                gap: '1rem',
-                                                marginTop: '1rem'
-                                            },
-                                            children: [
-                                                /*#__PURE__*/ _jsxDEV("button", {
-                                                    type: "button",
-                                                    onClick: function() {
-                                                        return handleDownloadCurrentImage(memoizedMatchingData.files[currentDisplayIndex], memoizedMatchingData.previewUrls[currentDisplayIndex]);
-                                                    },
-                                                    className: "button-secondary",
-                                                    children: "Download"
-                                                }, void 0, false, {
-                                                    fileName: "BatchCompareForm.jsx",
-                                                    lineNumber: 747,
-                                                    columnNumber: 21
-                                                }, _this),
-                                                /*#__PURE__*/ _jsxDEV("button", {
-                                                    type: "button",
-                                                    onClick: handleRejectImage,
-                                                    className: "button-secondary",
-                                                    style: {
-                                                        backgroundColor: 'var(--error-color)',
-                                                        color: 'var(--secondary-color)'
-                                                    },
-                                                    children: "Reject"
-                                                }, void 0, false, {
-                                                    fileName: "BatchCompareForm.jsx",
-                                                    lineNumber: 754,
-                                                    columnNumber: 21
-                                                }, _this)
-                                            ]
-                                        }, void 0, true, {
-                                            fileName: "BatchCompareForm.jsx",
-                                            lineNumber: 746,
-                                            columnNumber: 19
                                         }, _this),
                                         memoizedMatchingData.results.length > 0 && userId && /*#__PURE__*/ _jsxDEV("div", {
                                             style: {
@@ -1537,18 +1546,18 @@ var BatchCompareForm = function(param) {
                                                 ]
                                             }, void 0, true, {
                                                 fileName: "BatchCompareForm.jsx",
-                                                lineNumber: 767,
+                                                lineNumber: 774,
                                                 columnNumber: 21
                                             }, _this)
                                         }, void 0, false, {
                                             fileName: "BatchCompareForm.jsx",
-                                            lineNumber: 766,
+                                            lineNumber: 773,
                                             columnNumber: 19
                                         }, _this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "BatchCompareForm.jsx",
-                                    lineNumber: 647,
+                                    lineNumber: 664,
                                     columnNumber: 15
                                 }, _this),
                                 memoizedMatchingData.previewUrls.length === 0 && batchCompareResult && batchCompareResult.length > 0 && !internalIsLoading && /*#__PURE__*/ _jsxDEV("div", {
@@ -1563,18 +1572,18 @@ var BatchCompareForm = function(param) {
                                         children: "All matching images have been processed or rejected."
                                     }, void 0, false, {
                                         fileName: "BatchCompareForm.jsx",
-                                        lineNumber: 782,
+                                        lineNumber: 789,
                                         columnNumber: 19
                                     }, _this)
                                 }, void 0, false, {
                                     fileName: "BatchCompareForm.jsx",
-                                    lineNumber: 781,
+                                    lineNumber: 788,
                                     columnNumber: 16
                                 }, _this)
                             ]
                         }, void 0, true, {
                             fileName: "BatchCompareForm.jsx",
-                            lineNumber: 531,
+                            lineNumber: 548,
                             columnNumber: 9
                         }, _this),
                         externalErrorToDisplay && /*#__PURE__*/ _jsxDEV("div", {
@@ -1590,7 +1599,7 @@ var BatchCompareForm = function(param) {
                                     children: "Error:"
                                 }, void 0, false, {
                                     fileName: "BatchCompareForm.jsx",
-                                    lineNumber: 788,
+                                    lineNumber: 795,
                                     columnNumber: 13
                                 }, _this),
                                 " ",
@@ -1598,24 +1607,24 @@ var BatchCompareForm = function(param) {
                             ]
                         }, void 0, true, {
                             fileName: "BatchCompareForm.jsx",
-                            lineNumber: 787,
+                            lineNumber: 794,
                             columnNumber: 11
                         }, _this)
                     ]
                 }, void 0, true, {
                     fileName: "BatchCompareForm.jsx",
-                    lineNumber: 530,
+                    lineNumber: 547,
                     columnNumber: 7
                 }, _this)
             ]
         }, void 0, true, {
             fileName: "BatchCompareForm.jsx",
-            lineNumber: 518,
+            lineNumber: 535,
             columnNumber: 5
         }, _this)
     }, void 0, false, {
         fileName: "BatchCompareForm.jsx",
-        lineNumber: 517,
+        lineNumber: 534,
         columnNumber: 3
     }, _this);
 };

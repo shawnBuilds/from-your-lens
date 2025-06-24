@@ -67,26 +67,63 @@ var Tabs = function(param) {
         className: "tabs-container",
         style: style,
         children: [
-            /*#__PURE__*/ _jsxDEV("button", {
-                className: "tab-button ".concat(activeTab === TAB_OPTIONS.MY_DRIVE ? 'active' : ''),
-                onClick: function() {
-                    return handleTabClick(TAB_OPTIONS.MY_DRIVE);
-                },
+            /*#__PURE__*/ _jsxDEV("div", {
+                className: "tabs-group-left",
                 children: [
-                    /*#__PURE__*/ _jsxDEV("img", {
-                        src: ICON_URLS.MY_DRIVE,
-                        alt: "My Drive",
-                        className: "tab-icon"
-                    }, void 0, false, {
+                    /*#__PURE__*/ _jsxDEV("button", {
+                        className: "tab-button ".concat(activeTab === TAB_OPTIONS.MY_DRIVE ? 'active' : ''),
+                        onClick: function() {
+                            return handleTabClick(TAB_OPTIONS.MY_DRIVE);
+                        },
+                        children: [
+                            /*#__PURE__*/ _jsxDEV("img", {
+                                src: ICON_URLS.MY_DRIVE,
+                                alt: "My Drive",
+                                className: "tab-icon"
+                            }, void 0, false, {
+                                fileName: "Tabs.jsx",
+                                lineNumber: 24,
+                                columnNumber: 11
+                            }, _this),
+                            /*#__PURE__*/ _jsxDEV("span", {
+                                children: TAB_OPTIONS.MY_DRIVE
+                            }, void 0, false, {
+                                fileName: "Tabs.jsx",
+                                lineNumber: 25,
+                                columnNumber: 11
+                            }, _this)
+                        ]
+                    }, void 0, true, {
                         fileName: "Tabs.jsx",
-                        lineNumber: 23,
+                        lineNumber: 20,
                         columnNumber: 9
                     }, _this),
-                    /*#__PURE__*/ _jsxDEV("span", {
-                        children: TAB_OPTIONS.MY_DRIVE
-                    }, void 0, false, {
+                    /*#__PURE__*/ _jsxDEV("button", {
+                        className: "tab-button ".concat(activeTab === TAB_OPTIONS.PHOTOS_OF_YOU ? 'active' : ''),
+                        onClick: function() {
+                            return handleTabClick(TAB_OPTIONS.PHOTOS_OF_YOU);
+                        },
+                        children: [
+                            /*#__PURE__*/ _jsxDEV("img", {
+                                src: ICON_URLS.PHOTOS_OF_YOU,
+                                alt: "Photos of You",
+                                className: "tab-icon"
+                            }, void 0, false, {
+                                fileName: "Tabs.jsx",
+                                lineNumber: 31,
+                                columnNumber: 11
+                            }, _this),
+                            /*#__PURE__*/ _jsxDEV("span", {
+                                children: TAB_OPTIONS.PHOTOS_OF_YOU
+                            }, void 0, false, {
+                                fileName: "Tabs.jsx",
+                                lineNumber: 32,
+                                columnNumber: 11
+                            }, _this)
+                        ]
+                    }, void 0, true, {
                         fileName: "Tabs.jsx",
-                        lineNumber: 24,
+                        lineNumber: 27,
                         columnNumber: 9
                     }, _this)
                 ]
@@ -95,84 +132,65 @@ var Tabs = function(param) {
                 lineNumber: 19,
                 columnNumber: 7
             }, _this),
-            /*#__PURE__*/ _jsxDEV("button", {
-                className: "tab-button ".concat(activeTab === TAB_OPTIONS.PHOTOS_OF_YOU ? 'active' : ''),
-                onClick: function() {
-                    return handleTabClick(TAB_OPTIONS.PHOTOS_OF_YOU);
-                },
+            /*#__PURE__*/ _jsxDEV("div", {
+                className: "tabs-group-right",
                 children: [
-                    /*#__PURE__*/ _jsxDEV("img", {
-                        src: ICON_URLS.PHOTOS_OF_YOU,
-                        alt: "Photos of You",
-                        className: "tab-icon"
-                    }, void 0, false, {
+                    /*#__PURE__*/ _jsxDEV("button", {
+                        className: "tab-button",
+                        onClick: onComparePhotosClick,
+                        children: [
+                            /*#__PURE__*/ _jsxDEV("img", {
+                                src: ICON_URLS.FIND_PHOTOS,
+                                alt: "Find photos of me",
+                                className: "tab-icon"
+                            }, void 0, false, {
+                                fileName: "Tabs.jsx",
+                                lineNumber: 40,
+                                columnNumber: 11
+                            }, _this),
+                            /*#__PURE__*/ _jsxDEV("span", {
+                                children: "Find photos of me"
+                            }, void 0, false, {
+                                fileName: "Tabs.jsx",
+                                lineNumber: 41,
+                                columnNumber: 11
+                            }, _this)
+                        ]
+                    }, void 0, true, {
                         fileName: "Tabs.jsx",
-                        lineNumber: 30,
+                        lineNumber: 36,
                         columnNumber: 9
                     }, _this),
-                    /*#__PURE__*/ _jsxDEV("span", {
-                        children: TAB_OPTIONS.PHOTOS_OF_YOU
-                    }, void 0, false, {
+                    /*#__PURE__*/ _jsxDEV("button", {
+                        className: "tab-button",
+                        onClick: onComparePhotosClick,
+                        children: [
+                            /*#__PURE__*/ _jsxDEV("img", {
+                                src: ICON_URLS.SEND_PHOTOS,
+                                alt: "Send photos to a friend",
+                                className: "tab-icon"
+                            }, void 0, false, {
+                                fileName: "Tabs.jsx",
+                                lineNumber: 47,
+                                columnNumber: 11
+                            }, _this),
+                            /*#__PURE__*/ _jsxDEV("span", {
+                                children: "Send photos to a friend"
+                            }, void 0, false, {
+                                fileName: "Tabs.jsx",
+                                lineNumber: 48,
+                                columnNumber: 11
+                            }, _this)
+                        ]
+                    }, void 0, true, {
                         fileName: "Tabs.jsx",
-                        lineNumber: 31,
+                        lineNumber: 43,
                         columnNumber: 9
                     }, _this)
                 ]
             }, void 0, true, {
                 fileName: "Tabs.jsx",
-                lineNumber: 26,
-                columnNumber: 7
-            }, _this),
-            /*#__PURE__*/ _jsxDEV("button", {
-                className: "tab-button",
-                onClick: onComparePhotosClick,
-                children: [
-                    /*#__PURE__*/ _jsxDEV("img", {
-                        src: ICON_URLS.FIND_PHOTOS,
-                        alt: "Find photos of me",
-                        className: "tab-icon"
-                    }, void 0, false, {
-                        fileName: "Tabs.jsx",
-                        lineNumber: 37,
-                        columnNumber: 9
-                    }, _this),
-                    /*#__PURE__*/ _jsxDEV("span", {
-                        children: "Find photos of me"
-                    }, void 0, false, {
-                        fileName: "Tabs.jsx",
-                        lineNumber: 38,
-                        columnNumber: 9
-                    }, _this)
-                ]
-            }, void 0, true, {
-                fileName: "Tabs.jsx",
-                lineNumber: 33,
-                columnNumber: 7
-            }, _this),
-            /*#__PURE__*/ _jsxDEV("button", {
-                className: "tab-button",
-                onClick: onComparePhotosClick,
-                children: [
-                    /*#__PURE__*/ _jsxDEV("img", {
-                        src: ICON_URLS.SEND_PHOTOS,
-                        alt: "Send photos to a friend",
-                        className: "tab-icon"
-                    }, void 0, false, {
-                        fileName: "Tabs.jsx",
-                        lineNumber: 44,
-                        columnNumber: 9
-                    }, _this),
-                    /*#__PURE__*/ _jsxDEV("span", {
-                        children: "Send photos to a friend"
-                    }, void 0, false, {
-                        fileName: "Tabs.jsx",
-                        lineNumber: 45,
-                        columnNumber: 9
-                    }, _this)
-                ]
-            }, void 0, true, {
-                fileName: "Tabs.jsx",
-                lineNumber: 40,
+                lineNumber: 35,
                 columnNumber: 7
             }, _this)
         ]

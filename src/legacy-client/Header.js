@@ -273,47 +273,15 @@ var Header = function(param) {
                 children: [
                     /*#__PURE__*/ _jsxDEV("div", {
                         className: "header-left",
-                        children: [
-                            /*#__PURE__*/ _jsxDEV("div", {
-                                className: "window-dots",
-                                children: [
-                                    /*#__PURE__*/ _jsxDEV("span", {
-                                        className: "window-dot red-dot"
-                                    }, void 0, false, {
-                                        fileName: "Header.jsx",
-                                        lineNumber: 42,
-                                        columnNumber: 13
-                                    }, _this),
-                                    /*#__PURE__*/ _jsxDEV("span", {
-                                        className: "window-dot yellow-dot"
-                                    }, void 0, false, {
-                                        fileName: "Header.jsx",
-                                        lineNumber: 43,
-                                        columnNumber: 13
-                                    }, _this),
-                                    /*#__PURE__*/ _jsxDEV("span", {
-                                        className: "window-dot green-dot"
-                                    }, void 0, false, {
-                                        fileName: "Header.jsx",
-                                        lineNumber: 44,
-                                        columnNumber: 13
-                                    }, _this)
-                                ]
-                            }, void 0, true, {
-                                fileName: "Header.jsx",
-                                lineNumber: 41,
-                                columnNumber: 11
-                            }, _this),
-                            /*#__PURE__*/ _jsxDEV("h1", {
-                                className: "header-title",
-                                children: "FromYourLens"
-                            }, void 0, false, {
-                                fileName: "Header.jsx",
-                                lineNumber: 46,
-                                columnNumber: 11
-                            }, _this)
-                        ]
-                    }, void 0, true, {
+                        children: /*#__PURE__*/ _jsxDEV("h1", {
+                            className: "header-title",
+                            children: "FromYourLens"
+                        }, void 0, false, {
+                            fileName: "Header.jsx",
+                            lineNumber: 42,
+                            columnNumber: 11
+                        }, _this)
+                    }, void 0, false, {
                         fileName: "Header.jsx",
                         lineNumber: 40,
                         columnNumber: 9
@@ -331,7 +299,7 @@ var Header = function(param) {
                                 }
                             }, void 0, false, {
                                 fileName: "Header.jsx",
-                                lineNumber: 49,
+                                lineNumber: 45,
                                 columnNumber: 11
                             }, _this),
                             /*#__PURE__*/ _jsxDEV("button", {
@@ -340,13 +308,13 @@ var Header = function(param) {
                                 children: "Logout"
                             }, void 0, false, {
                                 fileName: "Header.jsx",
-                                lineNumber: 56,
+                                lineNumber: 52,
                                 columnNumber: 11
                             }, _this)
                         ]
                     }, void 0, true, {
                         fileName: "Header.jsx",
-                        lineNumber: 48,
+                        lineNumber: 44,
                         columnNumber: 9
                     }, _this)
                 ]
@@ -362,7 +330,7 @@ var Header = function(param) {
                 user: user
             }, void 0, false, {
                 fileName: "Header.jsx",
-                lineNumber: 61,
+                lineNumber: 57,
                 columnNumber: 7
             }, _this)
         ]

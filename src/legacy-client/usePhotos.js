@@ -210,7 +210,7 @@ function _ts_generator(thisArg, body) {
 }
 import { useState, useCallback, useEffect } from 'react';
 import { photosService } from './PhotosService.js';
-import { VIEW_STATES } from './constants.js';
+import { VIEW_STATES, MOCK_USER, MOCK_PHOTOS } from './constants.js';
 var PHOTOS_PER_PAGE = 10;
 // TOTAL_PHOTOS_TO_PRELOAD is removed as we paginate directly
 // Helper function to map API photo data to internal structure
@@ -221,10 +221,10 @@ var mapApiPhotoToInternalPhoto = function(apiPhoto) {
         return null;
     }
     // Attempt to find a usable image source URL
-    // Prioritize content_url, then productUrl (Google Photos specific), then baseUrl, then thumbnail_link
-    var imageSrc = apiPhoto.content_url || apiPhoto.productUrl || apiPhoto.baseUrl || apiPhoto.thumbnail_link;
+    // Prioritize content_url, then productUrl (Google Photos specific), then baseUrl, then thumbnail_link, and finally our internal 'src' for mock data/other cases
+    var imageSrc = apiPhoto.content_url || apiPhoto.productUrl || apiPhoto.baseUrl || apiPhoto.thumbnail_link || apiPhoto.src;
     if (!imageSrc) {
-        console.warn("[usePhotos mapApiPhotoToInternalPhoto] Photo ".concat(apiPhoto.id, " is missing a valid image source URL (content_url, productUrl, baseUrl, thumbnail_link)."), apiPhoto);
+        console.warn("[usePhotos mapApiPhotoToInternalPhoto] Photo ".concat(apiPhoto.id, " is missing a valid image source URL (content_url, productUrl, baseUrl, thumbnail_link, src)."), apiPhoto);
     // Depending on requirements, you might still return the photo metadata without src, or null.
     // For now, let's return it, PhotoItem will handle missing src.
     }
@@ -241,6 +241,7 @@ var mapApiPhotoToInternalPhoto = function(apiPhoto) {
 };
 export var usePhotos = function(currentUser, currentView) {
     var userId = currentUser === null || currentUser === void 0 ? void 0 : currentUser.id;
+    var isMockUser = userId === MOCK_USER.id;
     // State for "My Photos" (formerly "My Drive" photos)
     var _useState = _sliced_to_array(useState([]), 2), myPhotos = _useState[0], setMyPhotos = _useState[1]; // Stores all fetched "My Photos"
     var _useState1 = _sliced_to_array(useState(false), 2), isFetchingMyPhotos = _useState1[0], setIsFetchingMyPhotos = _useState1[1];
@@ -335,6 +336,25 @@ export var usePhotos = function(currentUser, currentView) {
         userId
     ]);
     useEffect(function() {
+        if (isMockUser) {
+            console.log('[usePhotos] Mock user detected. Loading mock photo data.');
+            // Set mock data for "My Photos"
+            setMyPhotos(MOCK_PHOTOS);
+            setMyPhotosInitialFetchComplete(true);
+            setIsFetchingMyPhotos(false);
+            setHasMoreMyPhotos(false);
+            setFetchMyPhotosError(null);
+            // Set mock data for "Photos of You" - Start with an empty list.
+            // This list will be populated when photos are confirmed via batch compare.
+            console.log('[usePhotos Mock] Initializing "photosOfYou" as an empty array. Photos will be added to this list after confirming matches in the batch compare tool.');
+            setAllPhotosOfYou([]);
+            setDisplayedPhotosOfYou([]);
+            setPhotosOfYouInitialFetchComplete(true);
+            setIsFetchingPhotosOfYou(false);
+            setHasMorePhotosOfYou(false);
+            setFetchPhotosOfYouError(null);
+            return; // Stop further execution
+        }
         if (userId && currentView === VIEW_STATES.PHOTOS && !myPhotosInitialFetchComplete) {
             fetchInitialMyPhotos();
         } else if (!userId) {
@@ -356,6 +376,7 @@ export var usePhotos = function(currentUser, currentView) {
         }
     }, [
         userId,
+        isMockUser,
         currentView,
         fetchInitialMyPhotos,
         myPhotosInitialFetchComplete
@@ -446,6 +467,12 @@ export var usePhotos = function(currentUser, currentView) {
             return _ts_generator(this, function(_state) {
                 switch(_state.label){
                     case 0:
+                        if (isMockUser) {
+                            console.log('[usePhotos] Skipping fetchInitialPhotosOfUser for mock user.');
+                            return [
+                                2
+                            ];
+                        }
                         if (!currentUserId) {
                             setAllPhotosOfYou([]);
                             setDisplayedPhotosOfYou([]);
@@ -601,8 +628,8 @@ export var usePhotos = function(currentUser, currentView) {
         currentPhotosOfYouOffset
     ]);
     var updateSinglePhotoMetadata = useCallback(function(updatedPhoto) {
-        if (!updatedPhoto || !updatedPhoto.drive_file_id) {
-            console.warn('[usePhotos updateSinglePhotoMetadata] Received invalid or incomplete photo data:', updatedPhoto);
+        if (!updatedPhoto || !updatedPhoto.id) {
+            console.warn('[usePhotos updateSinglePhotoMetadata] Received invalid or incomplete photo data (missing id):', updatedPhoto);
             return;
         }
         // The ID from Google Photos is `id`. Backend `photo` table also uses `id` (which is the Google mediaItem ID).
@@ -613,7 +640,7 @@ export var usePhotos = function(currentUser, currentView) {
             console.warn('[usePhotos updateSinglePhotoMetadata] Received photo data without an ID:', updatedPhoto);
             return;
         }
-        console.log("[usePhotos updateSinglePhotoMetadata] Updating photo ".concat(photoId, " with new data:"), updatedPhoto);
+        console.log("[usePhotos updateSinglePhotoMetadata] Updating photo ".concat(photoId, ". Received data with 'photo_of' property:"), updatedPhoto.photo_of);
         var mappedPhoto = mapApiPhotoToInternalPhoto(updatedPhoto); // Ensure consistent structure
         if (!mappedPhoto) {
             console.warn('[usePhotos updateSinglePhotoMetadata] Failed to map updated photo, aborting update:', updatedPhoto);
@@ -627,17 +654,49 @@ export var usePhotos = function(currentUser, currentView) {
         });
         // Update "Photos of You"
         // This list might also contain Google Photos if the backend links them.
-        setAllPhotosOfYou(function(prevMetadata) {
-            return prevMetadata.map(function(p) {
-                return p.id === photoId ? _object_spread({}, p, mappedPhoto) : p;
+        // Update "Photos of You"
+        // This function should now handle both adding a new photo and updating an existing one.
+        console.log("[usePhotos updateSinglePhotoMetadata] Checking 'photo_of' property for photo ".concat(photoId, ". Value:"), mappedPhoto.photoOf);
+        if (mappedPhoto.photoOf === userId) {
+            console.log("[usePhotos updateSinglePhotoMetadata] Condition met: Photo ".concat(photoId, " has 'photoOf' matching current user ").concat(userId, ". Adding/updating in 'photosOfYou' list."));
+            setAllPhotosOfYou(function(prevPhotos) {
+                var existingPhotoIndex = prevPhotos.findIndex(function(p) {
+                    return p.id === photoId;
+                });
+                if (existingPhotoIndex > -1) {
+                    console.log("  - Photo ".concat(photoId, " already exists in 'allPhotosOfYou'. Updating its data."));
+                    var newPhotos = _to_consumable_array(prevPhotos);
+                    newPhotos[existingPhotoIndex] = _object_spread({}, newPhotos[existingPhotoIndex], mappedPhoto);
+                    return newPhotos;
+                } else {
+                    console.log("  - Photo ".concat(photoId, " is new. Adding to 'allPhotosOfYou'."));
+                    return _to_consumable_array(prevPhotos).concat([
+                        mappedPhoto
+                    ]);
+                }
             });
-        });
-        setDisplayedPhotosOfYou(function(prevDisplayed) {
-            return prevDisplayed.map(function(p) {
-                return p.id === photoId ? _object_spread({}, p, mappedPhoto) : p;
+            setDisplayedPhotosOfYou(function(prevPhotos) {
+                var existingPhotoIndex = prevPhotos.findIndex(function(p) {
+                    return p.id === photoId;
+                });
+                if (existingPhotoIndex > -1) {
+                    console.log("  - Photo ".concat(photoId, " already exists in 'displayedPhotosOfYou'. Updating its data."));
+                    var newPhotos = _to_consumable_array(prevPhotos);
+                    newPhotos[existingPhotoIndex] = _object_spread({}, newPhotos[existingPhotoIndex], mappedPhoto);
+                    return newPhotos;
+                } else {
+                    console.log("  - Photo ".concat(photoId, " is new. Adding to 'displayedPhotosOfYou'."));
+                    return _to_consumable_array(prevPhotos).concat([
+                        mappedPhoto
+                    ]);
+                }
             });
-        });
-    }, []);
+        } else {
+            console.log("[usePhotos updateSinglePhotoMetadata] Condition not met: Photo ".concat(photoId, " 'photoOf' is \"").concat(mappedPhoto.photoOf, '", which does not match current user ').concat(userId, ". 'photosOfYou' list will not be updated for this photo."));
+        }
+    }, [
+        userId
+    ]);
     return {
         // "My Photos" related exports (formerly "My Drive")
         photos: myPhotos,
