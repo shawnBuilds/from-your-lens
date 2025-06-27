@@ -1,26 +1,12 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const session = require('express-session');
-const passport = require('passport');
 const pool = require('../db/pool');
 const { initializeDatabase } = require('../db/users');
 const Controls = require('./controls');
 
-// Conditionally import auth routes
-let authRoutes, verifyJWT;
-if (Controls.enableGoogleOAuth || Controls.enableSessionAuth) {
-    const authModule = require('./routes/auth');
-    authRoutes = authModule.router;
-    verifyJWT = authModule.verifyJWT;
-} else {
-    // Mock auth middleware for when OAuth is disabled
-    verifyJWT = (req, res, next) => {
-        // For now, just pass through - you can add mock user data here
-        req.user = { id: 1, email: 'mock@example.com' };
-        next();
-    };
-}
+// Import auth routes
+const { router: authRoutes, verifyJWT } = require('./routes/auth');
 
 const driveRoutes = require('./routes/drive');
 const faceRoutes = require('./routes/face');
@@ -44,29 +30,8 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Session configuration
-app.use(session({
-    secret: process.env.SESSION_SECRET || 'your-secret-key',
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: 24 * 60 * 60 * 1000, // 24 hours
-        httpOnly: true
-    }
-}));
-
-// Initialize Passport (only if auth is enabled)
-if (Controls.enableGoogleOAuth || Controls.enableSessionAuth) {
-    app.use(passport.initialize());
-    app.use(passport.session());
-}
-
 // Routes
-if (authRoutes) {
-    app.use('/auth', authRoutes);
-}
+app.use('/auth', authRoutes);
 app.use('/drive', driveRoutes);
 app.use('/api/face', faceRoutes);
 app.use('/api/users', verifyJWT, userRoutes);
@@ -109,8 +74,8 @@ async function startServer() {
         // Start the server
         app.listen(PORT, () => {
             console.log(`[Server] Running on port ${PORT}`);
-            console.log(`[Server] Google OAuth: ${Controls.enableGoogleOAuth ? 'ENABLED' : 'DISABLED'}`);
             console.log(`[Server] Face Detection: ${Controls.enableFaceDetection ? 'ENABLED' : 'DISABLED'}`);
+            console.log(`[Server] JWT Auth: ${Controls.enableJWT ? 'ENABLED' : 'DISABLED'}`);
         });
     } catch (err) {
         console.error('[Server] Failed to initialize database:', err);

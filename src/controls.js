@@ -1,8 +1,6 @@
 // Feature Controls - Centralized configuration for enabling/disabling features
 const Controls = {
     // Authentication Controls
-    enableGoogleOAuth: false,
-    enableSessionAuth: false,
     enableJWT: true,
     
     // API Controls
