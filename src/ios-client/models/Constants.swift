@@ -32,11 +32,11 @@ struct FeatureFlags {
 struct APIConfig {
     // MARK: - Environment Configuration
     // Set this to true for production, false for local development
-    static let useProductionServer = false
+    static let useProductionServer = true
     
     static let baseURL: String = {
         if useProductionServer {
-            return "https://your-heroku-app.herokuapp.com"
+            return "https://fromyourlens-904e01076638.herokuapp.com"
         } else {
             return "http://127.0.0.1:3000"
         }

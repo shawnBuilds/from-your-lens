@@ -5,7 +5,23 @@ const session = require('express-session');
 const passport = require('passport');
 const pool = require('../db/pool');
 const { initializeDatabase } = require('../db/users');
-const { router: authRoutes, verifyJWT } = require('./routes/auth');
+const Controls = require('./controls');
+
+// Conditionally import auth routes
+let authRoutes, verifyJWT;
+if (Controls.enableGoogleOAuth || Controls.enableSessionAuth) {
+    const authModule = require('./routes/auth');
+    authRoutes = authModule.router;
+    verifyJWT = authModule.verifyJWT;
+} else {
+    // Mock auth middleware for when OAuth is disabled
+    verifyJWT = (req, res, next) => {
+        // For now, just pass through - you can add mock user data here
+        req.user = { id: 1, email: 'mock@example.com' };
+        next();
+    };
+}
+
 const driveRoutes = require('./routes/drive');
 const faceRoutes = require('./routes/face');
 const userRoutes = require('./routes/user');
@@ -19,7 +35,7 @@ const app = express();
 // Middleware
 app.use(cors({
     origin: process.env.NODE_ENV === 'production' 
-        ? ['https://canvas.play.rosebud.ai', 'https://your-heroku-app.herokuapp.com']
+        ? ['https://canvas.play.rosebud.ai', 'https://fromyourlens-904e01076638.herokuapp.com']
         : ['http://localhost:3000', 'http://127.0.0.1:3000', 'https://canvas.play.rosebud.ai'],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
@@ -41,12 +57,16 @@ app.use(session({
     }
 }));
 
-// Initialize Passport
-app.use(passport.initialize());
-app.use(passport.session());
+// Initialize Passport (only if auth is enabled)
+if (Controls.enableGoogleOAuth || Controls.enableSessionAuth) {
+    app.use(passport.initialize());
+    app.use(passport.session());
+}
 
 // Routes
-app.use('/auth', authRoutes);
+if (authRoutes) {
+    app.use('/auth', authRoutes);
+}
 app.use('/drive', driveRoutes);
 app.use('/api/face', faceRoutes);
 app.use('/api/users', verifyJWT, userRoutes);
@@ -74,17 +94,23 @@ async function startServer() {
     try {
         console.log('[Server] Initializing database tables...');
         
-        // Initialize users table first
-        await initializeDatabase();
-        console.log('[Server] Users table initialized');
-        
-        // Then initialize photos table (which depends on users table)
-        await createPhotosTable();
-        console.log('[Server] Photos table initialized');
+        if (Controls.enableDatabaseInitialization) {
+            // Initialize users table first
+            await initializeDatabase();
+            console.log('[Server] Users table initialized');
+            
+            // Then initialize photos table (which depends on users table)
+            await createPhotosTable();
+            console.log('[Server] Photos table initialized');
+        } else {
+            console.log('[Server] Database initialization disabled');
+        }
         
         // Start the server
         app.listen(PORT, () => {
             console.log(`[Server] Running on port ${PORT}`);
+            console.log(`[Server] Google OAuth: ${Controls.enableGoogleOAuth ? 'ENABLED' : 'DISABLED'}`);
+            console.log(`[Server] Face Detection: ${Controls.enableFaceDetection ? 'ENABLED' : 'DISABLED'}`);
         });
     } catch (err) {
         console.error('[Server] Failed to initialize database:', err);
