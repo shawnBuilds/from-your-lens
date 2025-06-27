@@ -52,11 +52,12 @@ import Tabs, { TAB_OPTIONS } from './Tabs.js'; // Import TAB_OPTIONS
 import PhotoGallery from './PhotoGallery.js';
 import BatchCompareForm from './BatchCompareForm.js';
 import LoadingIndicator from './LoadingIndicator.js'; // Import the new LoadingIndicator
-import { DEFAULT_BATCH_TARGET_COUNT } from './constants.js';
+import { DEFAULT_BATCH_TARGET_COUNT, MOCK_USER, MOCK_PHOTOS } from './constants.js';
 var PhotosView = function(param) {
     var onLogout = param.onLogout, photos = param.photos, user = param.user, isFetchingPhotos = param.isFetchingPhotos, fetchPhotosError = param.fetchPhotosError, loadMorePhotos = param.loadMorePhotos, hasMorePhotos = param.hasMorePhotos, onProfilePictureUpdate = param.onProfilePictureUpdate, updateSinglePhotoMetadata = param.updateSinglePhotoMetadata, // Props for "Photos of You"
     photosOfYou = param.photosOfYou, isFetchingPhotosOfYou = param.isFetchingPhotosOfYou, fetchPhotosOfYouError = param.fetchPhotosOfYouError, fetchInitialPhotosOfUser = param.fetchInitialPhotosOfUser, loadMorePhotosOfUser = param.loadMorePhotosOfUser, hasMorePhotosOfYou = param.hasMorePhotosOfYou, photosOfYouInitialFetchComplete = param.photosOfYouInitialFetchComplete;
-    var _useState = _sliced_to_array(useState(false), 2), isInitialLoadingComplete = _useState[0], setIsInitialLoadingComplete = _useState[1]; // Overall loading complete state
+    var isMockUser = (user === null || user === void 0 ? void 0 : user.id) === MOCK_USER.id;
+    var _useState = _sliced_to_array(useState(isMockUser), 2), isInitialLoadingComplete = _useState[0], setIsInitialLoadingComplete = _useState[1]; // Overall loading complete state
     var _useState1 = _sliced_to_array(useState(false), 2), myDriveFetchAttempted = _useState1[0], setMyDriveFetchAttempted = _useState1[1];
     var _useState2 = _sliced_to_array(useState(false), 2), showBatchCompareModal = _useState2[0], setShowBatchCompareModal = _useState2[1];
     var _useState3 = _sliced_to_array(useState(new Map()), 2), preloadedImageBlobs = _useState3[0], setPreloadedImageBlobs = _useState3[1];
@@ -64,7 +65,7 @@ var PhotosView = function(param) {
     // State for tracking initial "My Drive" photo rendering
     var _useState5 = _sliced_to_array(useState(new Set()), 2), initialMyDrivePhotoIds = _useState5[0], setInitialMyDrivePhotoIds = _useState5[1];
     var _useState6 = _sliced_to_array(useState(new Set()), 2), renderedInitialMyDrivePhotoIds = _useState6[0], setRenderedInitialMyDrivePhotoIds = _useState6[1];
-    var _useState7 = _sliced_to_array(useState(false), 2), myDriveMetadataLoadComplete = _useState7[0], setMyDriveMetadataLoadComplete = _useState7[1];
+    var _useState7 = _sliced_to_array(useState(isMockUser), 2), myDriveMetadataLoadComplete = _useState7[0], setMyDriveMetadataLoadComplete = _useState7[1];
     useEffect(function() {
         // Track if an initial fetch for "My Drive" photos has been triggered.
         if (isFetchingPhotos) {
@@ -74,6 +75,11 @@ var PhotosView = function(param) {
         isFetchingPhotos
     ]);
     useEffect(function() {
+        console.log('[PhotosView MetadataEffect] Running. State:', {
+            myDriveFetchAttempted: myDriveFetchAttempted,
+            isFetchingPhotos: isFetchingPhotos,
+            myDriveMetadataLoadComplete: myDriveMetadataLoadComplete
+        });
         // This effect manages setting myDriveMetadataLoadComplete and initialMyDrivePhotoIds
         // ONCE the initial fetch for "My Drive" photos is done.
         if (myDriveFetchAttempted && !isFetchingPhotos) {
@@ -107,6 +113,13 @@ var PhotosView = function(param) {
     ]);
     useEffect(function() {
         // Determine if the overall initial loading for PhotosView is complete.
+        console.log('[PhotosView LoadingCompleteEffect] Running. State:', {
+            isInitialLoadingComplete: isInitialLoadingComplete,
+            myDriveMetadataLoadComplete: myDriveMetadataLoadComplete,
+            fetchPhotosError: fetchPhotosError,
+            initialPhotoIds: initialMyDrivePhotoIds.size,
+            renderedPhotoIds: renderedInitialMyDrivePhotoIds.size
+        });
         if (!isInitialLoadingComplete && myDriveMetadataLoadComplete) {
             if (fetchPhotosError) {
                 // If there's an error fetching metadata, we complete loading to show the error.
@@ -142,7 +155,12 @@ var PhotosView = function(param) {
         });
     }, []);
     useEffect(function() {
-        console.log('[PhotosView] Mounted/Updated. User ID:', user === null || user === void 0 ? void 0 : user.id, 'Current Tab:', currentPhotoViewTab);
+        console.log('[PhotosView] Mounted/Updated. User ID:', user === null || user === void 0 ? void 0 : user.id, 'Current Tab:', currentPhotoViewTab, 'Is Mock:', isMockUser);
+        // The explicit mock user check is removed from here.
+        // The fetchInitialPhotosOfUser function in the usePhotos hook
+        // has its own guard against making API calls for the mock user.
+        // This allows the component to correctly render photosOfYou that are added
+        // to the mock user's state via other means (like batch compare).
         if (currentPhotoViewTab === TAB_OPTIONS.PHOTOS_OF_YOU && (user === null || user === void 0 ? void 0 : user.id) && !photosOfYouInitialFetchComplete && !isFetchingPhotosOfYou) {
             console.log('[PhotosView] "Photos of You" tab active, fetching initial set.');
             fetchInitialPhotosOfUser(user.id);
@@ -208,7 +226,7 @@ var PhotosView = function(param) {
                     onProfilePictureUpdate: onProfilePictureUpdate
                 }, void 0, false, {
                     fileName: "PhotosView.jsx",
-                    lineNumber: 158,
+                    lineNumber: 166,
                     columnNumber: 9
                 }, _this),
                 /*#__PURE__*/ _jsxDEV(LoadingIndicator, {
@@ -216,14 +234,14 @@ var PhotosView = function(param) {
                     subText: subLoadingText
                 }, void 0, false, {
                     fileName: "PhotosView.jsx",
-                    lineNumber: 160,
+                    lineNumber: 168,
                     columnNumber: 9
                 }, _this)
             ]
         }, void 0, true);
     }
     // If initial metadata fetching is complete, prepare to render the main content
-    console.log("[PhotosView] Rendering main content structure. Tab: ".concat(currentPhotoViewTab, ", MyDrive All Images Rendered: ").concat(isInitialLoadingComplete));
+    console.log("[PhotosView] Rendering main content structure. Tab: ".concat(currentPhotoViewTab, ", MyDrive All Images Rendered: ").concat(isInitialLoadingComplete, ", Photos Prop Count: ").concat(photos.length));
     // Standardized loading text for subsequent stages
     var mainLoadingText1 = "Checking your photos...";
     var subLoadingText1 = "This might take a few seconds.";
@@ -242,7 +260,7 @@ var PhotosView = function(param) {
                 onProfilePictureUpdate: onProfilePictureUpdate
             }, void 0, false, {
                 fileName: "PhotosView.jsx",
-                lineNumber: 173,
+                lineNumber: 181,
                 columnNumber: 7
             }, _this),
             /*#__PURE__*/ _jsxDEV(Tabs, {
@@ -258,7 +276,7 @@ var PhotosView = function(param) {
                 }
             }, void 0, false, {
                 fileName: "PhotosView.jsx",
-                lineNumber: 179,
+                lineNumber: 187,
                 columnNumber: 7
             }, _this),
             /*#__PURE__*/ _jsxDEV("div", {
@@ -279,7 +297,7 @@ var PhotosView = function(param) {
                                 subText: subLoadingText1
                             }, void 0, false, {
                                 fileName: "PhotosView.jsx",
-                                lineNumber: 199,
+                                lineNumber: 207,
                                 columnNumber: 13
                             }, _this),
                             (myDriveMetadataLoadComplete || fetchPhotosError) && /*#__PURE__*/ _jsxDEV("div", {
@@ -299,18 +317,18 @@ var PhotosView = function(param) {
                                     preloadedImageBlobs: preloadedImageBlobs
                                 }, void 0, false, {
                                     fileName: "PhotosView.jsx",
-                                    lineNumber: 207,
+                                    lineNumber: 215,
                                     columnNumber: 15
                                 }, _this)
                             }, void 0, false, {
                                 fileName: "PhotosView.jsx",
-                                lineNumber: 202,
+                                lineNumber: 210,
                                 columnNumber: 13
                             }, _this)
                         ]
                     }, void 0, true, {
                         fileName: "PhotosView.jsx",
-                        lineNumber: 194,
+                        lineNumber: 202,
                         columnNumber: 9
                     }, _this),
                     /*#__PURE__*/ _jsxDEV("div", {
@@ -324,7 +342,7 @@ var PhotosView = function(param) {
                                 subText: subLoadingText1
                             }, void 0, false, {
                                 fileName: "PhotosView.jsx",
-                                lineNumber: 226,
+                                lineNumber: 234,
                                 columnNumber: 14
                             }, _this),
                             (photosOfYouInitialFetchComplete || fetchPhotosOfYouError) && !isFetchingPhotosOfYou && /*#__PURE__*/ _jsxDEV("div", {
@@ -347,25 +365,25 @@ var PhotosView = function(param) {
                                         preloadedImageBlobs: preloadedImageBlobs
                                     }, void 0, false, {
                                         fileName: "PhotosView.jsx",
-                                        lineNumber: 230,
+                                        lineNumber: 238,
                                         columnNumber: 15
                                     }, _this)
                                 ]
                             }, void 0, true, {
                                 fileName: "PhotosView.jsx",
-                                lineNumber: 229,
+                                lineNumber: 237,
                                 columnNumber: 13
                             }, _this)
                         ]
                     }, void 0, true, {
                         fileName: "PhotosView.jsx",
-                        lineNumber: 221,
+                        lineNumber: 229,
                         columnNumber: 9
                     }, _this)
                 ]
             }, void 0, true, {
                 fileName: "PhotosView.jsx",
-                lineNumber: 192,
+                lineNumber: 200,
                 columnNumber: 7
             }, _this),
             showBatchCompareModal && /*#__PURE__*/ _jsxDEV(BatchCompareForm, {
@@ -384,19 +402,19 @@ var PhotosView = function(param) {
                     code: "POST /api/face/batch-compare"
                 },
                 sourceImageUrlFromProp: user === null || user === void 0 ? void 0 : user.profilePictureUrl,
-                targetPhotosFromDrive: photos.slice(0, DEFAULT_BATCH_TARGET_COUNT),
+                targetPhotosFromDrive: isMockUser ? MOCK_PHOTOS.slice(0, DEFAULT_BATCH_TARGET_COUNT) : photos.slice(0, DEFAULT_BATCH_TARGET_COUNT),
                 preloadedImageBlobs: preloadedImageBlobs,
                 userId: user === null || user === void 0 ? void 0 : user.id,
                 updateSinglePhotoMetadata: updateSinglePhotoMetadata
             }, void 0, false, {
                 fileName: "PhotosView.jsx",
-                lineNumber: 246,
+                lineNumber: 254,
                 columnNumber: 9
             }, _this)
         ]
     }, void 0, true, {
         fileName: "PhotosView.jsx",
-        lineNumber: 172,
+        lineNumber: 180,
         columnNumber: 5
     }, _this);
 };

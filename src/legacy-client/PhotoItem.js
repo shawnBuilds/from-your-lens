@@ -173,10 +173,13 @@ import { jsxDEV as _jsxDEV } from "react/jsx-dev-runtime";
 import React, { useState, useEffect, useRef } from 'react';
 import { photosService } from './PhotosService.js';
 import { faceApiService } from './FaceApiService.js';
-import { ENABLE_FACE_DETECTION_ON_IMAGE_LOAD, SHOW_FACE_COUNT_BADGE } from './constants.js';
+import { ENABLE_FACE_DETECTION_ON_IMAGE_LOAD, SHOW_FACE_COUNT_BADGE, MOCK_PHOTOS } from './constants.js';
 var PhotoItem = function(param) {
-    var fileId = param.fileId, alt = param.alt, onImageBlobReady = param.onImageBlobReady, onImageRendered = param.onImageRendered, initialBlob = param.initialBlob;
-    var _useState = _sliced_to_array(useState(null), 2), imageSrc = _useState[0], setImageSrc = _useState[1];
+    var fileId = param.fileId, alt = param.alt, src = param.src, onImageBlobReady = param.onImageBlobReady, onImageRendered = param.onImageRendered, initialBlob = param.initialBlob;
+    var isMockPhoto = MOCK_PHOTOS.some(function(p) {
+        return p.id === fileId;
+    });
+    var _useState = _sliced_to_array(useState(isMockPhoto ? src : null), 2), imageSrc = _useState[0], setImageSrc = _useState[1];
     var imgRef = useRef(null);
     var _useState1 = _sliced_to_array(useState(!initialBlob), 2), isLoading = _useState1[0], setIsLoading = _useState1[1]; // If initialBlob, not loading initially
     var _useState2 = _sliced_to_array(useState(null), 2), error = _useState2[0], setError = _useState2[1];
@@ -190,6 +193,12 @@ var PhotoItem = function(param) {
                 return _ts_generator(this, function(_state) {
                     switch(_state.label){
                         case 0:
+                            if (isMockPhoto) {
+                                setIsLoading(false);
+                                return [
+                                    2
+                                ];
+                            }
                             if (!fileId) {
                                 setError('No File ID provided');
                                 setIsLoading(false);
@@ -394,14 +403,14 @@ var PhotoItem = function(param) {
                     }
                 }, void 0, false, {
                     fileName: "PhotoItem.jsx",
-                    lineNumber: 98,
+                    lineNumber: 103,
                     columnNumber: 9
                 }, _this),
                 " "
             ]
         }, void 0, true, {
             fileName: "PhotoItem.jsx",
-            lineNumber: 96,
+            lineNumber: 101,
             columnNumber: 7
         }, _this);
     }
@@ -414,19 +423,19 @@ var PhotoItem = function(param) {
                     ":",
                     /*#__PURE__*/ _jsxDEV("br", {}, void 0, false, {
                         fileName: "PhotoItem.jsx",
-                        lineNumber: 106,
+                        lineNumber: 111,
                         columnNumber: 29
                     }, _this),
                     error
                 ]
             }, void 0, true, {
                 fileName: "PhotoItem.jsx",
-                lineNumber: 106,
+                lineNumber: 111,
                 columnNumber: 9
             }, _this)
         }, void 0, false, {
             fileName: "PhotoItem.jsx",
-            lineNumber: 105,
+            lineNumber: 110,
             columnNumber: 7
         }, _this);
     }
@@ -446,7 +455,7 @@ var PhotoItem = function(param) {
                     }
                 }, void 0, false, {
                     fileName: "PhotoItem.jsx",
-                    lineNumber: 114,
+                    lineNumber: 119,
                     columnNumber: 9
                 }, _this),
                 SHOW_FACE_COUNT_BADGE && typeof faceCount === 'number' && /*#__PURE__*/ _jsxDEV("div", {
@@ -454,13 +463,13 @@ var PhotoItem = function(param) {
                     children: faceCount > 0 ? "".concat(faceCount, " face").concat(faceCount > 1 ? 's' : '') : 'No faces'
                 }, void 0, false, {
                     fileName: "PhotoItem.jsx",
-                    lineNumber: 126,
+                    lineNumber: 131,
                     columnNumber: 11
                 }, _this)
             ]
         }, void 0, true, {
             fileName: "PhotoItem.jsx",
-            lineNumber: 113,
+            lineNumber: 118,
             columnNumber: 7
         }, _this);
     }

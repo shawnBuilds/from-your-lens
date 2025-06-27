@@ -187,7 +187,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import LandingPage from './LandingPage.js';
 import PhotosView from './PhotosView.js';
 import TestingForm from './TestingForm.js';
-import { VIEW_STATES, STORAGE_KEYS, SHOW_TESTING_FORM_ON_START } from './constants.js';
+import { VIEW_STATES, STORAGE_KEYS, SHOW_TESTING_FORM_ON_START, MOCK_USER } from './constants.js';
 import { loadFromLocalStorage, saveToLocalStorage, logStorageEvent } from './localStorageUtils.js';
 import { AuthService } from './AuthService.js';
 import { UserService } from './UserService.js';
@@ -252,13 +252,19 @@ var App = function() {
         }();
         initializeApp();
     }, []);
-    var handleAuthSuccess = function() {
-        console.log('[App] Handling successful authentication callback...');
+    var handleAuthSuccess = function(authResult) {
+        console.log('[App] Handling successful authentication callback...', authResult);
+        if (authResult === null || authResult === void 0 ? void 0 : authResult.isSkipped) {
+            console.log('[App] Skipping authentication, using mock user.');
+            setCurrentUser(MOCK_USER);
+            setCurrentView(VIEW_STATES.PHOTOS);
+            return;
+        }
         var user = loadFromLocalStorage(STORAGE_KEYS.USER_DATA, 'User Data', true);
         console.log('[App] Reloaded user data from localStorage:', user);
         if (user) {
             setCurrentUser(user);
-            console.log('[App] Current user set. Navigating to LANDING view.');
+            console.log('[App] Current user set. Transitioning to Photos view.');
         } else {
             console.warn('[App] Auth success callback, but no user data found in localStorage. Check AuthService handling.');
         }
@@ -382,7 +388,7 @@ var App = function() {
                 children: "Loading..."
             }, void 0, false, {
                 fileName: "App.jsx",
-                lineNumber: 140,
+                lineNumber: 144,
                 columnNumber: 14
             }, _this);
         }
@@ -390,7 +396,7 @@ var App = function() {
             console.log('[App renderCurrentView] Rendering: TestingForm (SHOW_TESTING_FORM_ON_START)');
             return /*#__PURE__*/ _jsxDEV(TestingForm, {}, void 0, false, {
                 fileName: "App.jsx",
-                lineNumber: 144,
+                lineNumber: 148,
                 columnNumber: 14
             }, _this);
         }
@@ -416,7 +422,7 @@ var App = function() {
                 photosOfYouInitialFetchComplete: photosOfYouInitialFetchComplete
             }, void 0, false, {
                 fileName: "App.jsx",
-                lineNumber: 149,
+                lineNumber: 153,
                 columnNumber: 9
             }, _this);
         }
@@ -426,7 +432,7 @@ var App = function() {
                 onAuthSuccess: handleAuthSuccess
             }, void 0, false, {
                 fileName: "App.jsx",
-                lineNumber: 172,
+                lineNumber: 176,
                 columnNumber: 14
             }, _this); // Pass onAuthSuccess directly
         }
@@ -453,7 +459,7 @@ var App = function() {
         children: renderCurrentView()
     }, void 0, false, {
         fileName: "App.jsx",
-        lineNumber: 189,
+        lineNumber: 193,
         columnNumber: 5
     }, _this);
 };

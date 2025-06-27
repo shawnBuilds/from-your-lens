@@ -79,6 +79,7 @@ var PhotoGallery = function(param) {
                     return /*#__PURE__*/ _jsxDEV(PhotoItem, {
                         fileId: photo.id,
                         alt: photo.alt,
+                        src: photo.src,
                         onImageBlobReady: onImageBlobReady,
                         onImageRendered: onImageRendered,
                         // Pass down the preloaded blob if available for this photo
@@ -108,12 +109,12 @@ var PhotoGallery = function(param) {
                     children: isFetchingPhotos ? 'Loading...' : 'Load More Photos'
                 }, void 0, false, {
                     fileName: "PhotoGallery.jsx",
-                    lineNumber: 57,
+                    lineNumber: 58,
                     columnNumber: 11
                 }, _this)
             }, void 0, false, {
                 fileName: "PhotoGallery.jsx",
-                lineNumber: 56,
+                lineNumber: 57,
                 columnNumber: 9
             }, _this)
         ]

@@ -18,7 +18,9 @@ const app = express();
 
 // Middleware
 app.use(cors({
-    origin: 'https://canvas.play.rosebud.ai',
+    origin: process.env.NODE_ENV === 'production' 
+        ? ['https://canvas.play.rosebud.ai', 'https://your-heroku-app.herokuapp.com']
+        : ['http://localhost:3000', 'http://127.0.0.1:3000', 'https://canvas.play.rosebud.ai'],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
@@ -67,17 +69,27 @@ app.use((err, req, res, next) => {
 // Initialize database and start server
 const PORT = process.env.PORT || 5000;
 
-// Initialize all database tables
-Promise.all([
-    initializeDatabase(),
-    createPhotosTable()
-])
-    .then(() => {
+// Initialize all database tables sequentially
+async function startServer() {
+    try {
+        console.log('[Server] Initializing database tables...');
+        
+        // Initialize users table first
+        await initializeDatabase();
+        console.log('[Server] Users table initialized');
+        
+        // Then initialize photos table (which depends on users table)
+        await createPhotosTable();
+        console.log('[Server] Photos table initialized');
+        
+        // Start the server
         app.listen(PORT, () => {
             console.log(`[Server] Running on port ${PORT}`);
         });
-    })
-    .catch(err => {
+    } catch (err) {
         console.error('[Server] Failed to initialize database:', err);
         process.exit(1);
-    }); 
+    }
+}
+
+startServer(); 
