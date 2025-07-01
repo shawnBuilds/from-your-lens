@@ -22,12 +22,6 @@ class UserService: UserServiceProtocol {
             email: "user@example.com",
             fullName: "Mock User",
             profilePictureUrl: "https://example.com/uploaded_profile.jpg",
-            driveAccessToken: nil,
-            driveRefreshToken: nil,
-            driveTokenExpiry: nil,
-            photosAccessToken: nil,
-            photosRefreshToken: nil,
-            photosTokenExpiry: nil,
             createdAt: Date(),
             lastLogin: Date()
         )

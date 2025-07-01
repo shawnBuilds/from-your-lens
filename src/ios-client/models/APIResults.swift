@@ -43,8 +43,10 @@ struct FaceComparisonResult {
 }
 
 // MARK: - Batch Compare Results
-struct BatchCompareResult {
+struct BatchCompareResult: Identifiable {
+    var id: String { targetFileName }
     let targetFileName: String
+    let photo: Photo
     let faceMatches: [FaceMatch]
     let unmatchedFaces: [FaceDetail]
     let sourceFaceCount: Int
@@ -453,6 +455,7 @@ extension FaceComparisonResult {
 extension BatchCompareResult {
     static let mockMatch = BatchCompareResult(
         targetFileName: "photo1.jpg",
+        photo: Photo.mockPhotos[0],
         faceMatches: [
             FaceMatch(
                 similarity: 95.5,
@@ -486,6 +489,7 @@ extension BatchCompareResult {
     
     static let mockNoMatch = BatchCompareResult(
         targetFileName: "photo2.jpg",
+        photo: Photo.mockPhotos[1],
         faceMatches: [],
         unmatchedFaces: [
             FaceDetail(
@@ -516,6 +520,7 @@ extension BatchCompareResult {
     
     static let mockError = BatchCompareResult(
         targetFileName: "photo3.jpg",
+        photo: Photo.mockPhotos[2],
         faceMatches: [],
         unmatchedFaces: [],
         sourceFaceCount: 0,

@@ -1,6 +1,7 @@
 import Foundation
 import SwiftUI
 import Combine
+import GoogleSignIn
 
 @MainActor
 class AppState: ObservableObject {
@@ -27,6 +28,8 @@ class AppState: ObservableObject {
     @Published var isBatchCompareModalPresented: Bool = false
     @Published var isBatchComparing: Bool = false
     @Published var batchCompareProgress: Double = 0.0
+    @Published var matchesAttempted: Int = 0
+    @Published var batchCompareState: BatchCompareState = .waiting
     @Published var batchCompareResults: [BatchCompareResult] = []
     @Published var batchCompareError: String?
     @Published var selectedSourcePhoto: Photo?
@@ -35,6 +38,7 @@ class AppState: ObservableObject {
     // MARK: - Private Properties
     private var cancellables = Set<AnyCancellable>()
     private let authService = AuthService()
+    private let googleOAuthService = GoogleOAuthService()
     private let userService = UserService()
     private let photosService = PhotosService()
     private let faceApiService = FaceApiService()
@@ -66,20 +70,33 @@ class AppState: ObservableObject {
     
     // MARK: - User Authentication
     private func checkReturningUser() async {
-        do {
-            let result = try await authService.handleReturningUser()
-            if result.sessionValid, let user = result.user {
-                currentUser = user
-                currentView = .photos
-                
-                // Fetch photos based on feature flags
-                await fetchPhotosForUser(user)
-            } else {
+        // Check for existing Google OAuth session
+        await googleOAuthService.checkForExistingSignIn()
+        
+        if googleOAuthService.isAuthenticated, let user = googleOAuthService.currentUser {
+            print("[AppState] Found existing Google OAuth session for user:", user.email)
+            currentUser = user
+            currentView = .photos
+            
+            // Fetch photos based on feature flags
+            await fetchPhotosForUser(user)
+        } else {
+            // Fallback to legacy auth service
+            do {
+                let result = try await authService.handleReturningUser()
+                if result.sessionValid, let user = result.user {
+                    currentUser = user
+                    currentView = .photos
+                    
+                    // Fetch photos based on feature flags
+                    await fetchPhotosForUser(user)
+                } else {
+                    currentView = .landing
+                }
+            } catch {
+                print("[AppState] Error checking returning user:", error)
                 currentView = .landing
             }
-        } catch {
-            print("[AppState] Error checking returning user:", error)
-            currentView = .landing
         }
         
         isLoading = false
@@ -93,6 +110,20 @@ class AppState: ObservableObject {
     }
     
     // MARK: - Authentication Methods
+    func handleGoogleSignIn() async throws {
+        print("[AppState] Initiating Google Sign-In...")
+        
+        let user = try await googleOAuthService.signIn()
+        print("[AppState] Google Sign-In successful for user:", user.email)
+        
+        // Update current user and navigate to photos
+        currentUser = user
+        currentView = .photos
+        
+        // Fetch photos for the user
+        await fetchPhotosForUser(user)
+    }
+    
     func handleAuthSuccess() {
         print("[AppState] Handling successful authentication callback...")
         
@@ -112,12 +143,21 @@ class AppState: ObservableObject {
         print("[AppState] Initiating logout process...")
         
         do {
+            // Sign out from Google OAuth
+            try await googleOAuthService.signOut()
+            print("[AppState] Google OAuth sign out successful")
+        } catch {
+            print("[AppState] Error during Google OAuth sign out:", error)
+        }
+        
+        // Also try server logout for cleanup
+        do {
             let logoutResult = try await authService.logout()
             if !logoutResult.success {
                 print("[AppState] Server logout was not successful or an error occurred. Details:", logoutResult.error ?? "Unknown error")
             }
         } catch {
-            print("[AppState] Error during logout:", error)
+            print("[AppState] Error during server logout:", error)
         }
         
         print("[AppState] Clearing client-side session data.")
@@ -264,6 +304,7 @@ class AppState: ObservableObject {
     func startBatchCompare(sourcePhoto: Photo, targetPhotos: [Photo]) async {
         guard !targetPhotos.isEmpty else {
             batchCompareError = "No target photos selected"
+            batchCompareState = .error
             return
         }
         
@@ -271,17 +312,24 @@ class AppState: ObservableObject {
         selectedTargetPhotos = targetPhotos
         isBatchComparing = true
         batchCompareProgress = 0.0
+        matchesAttempted = 0
         batchCompareResults = []
         batchCompareError = nil
+        batchCompareState = .matching
         
         if FeatureFlags.enableDebugLogFaceDetection {
             print("[AppState] Starting batch compare with \(targetPhotos.count) target photos")
+        }
+        
+        if FeatureFlags.enableDebugBatchCompareModal {
+            print("[BatchCompareModal] State transition: WAITING → MATCHING")
         }
         
         do {
             // Convert source photo to image data
             guard let sourceImageData = await convertPhotoToImageData(sourcePhoto) else {
                 batchCompareError = "Failed to load source image"
+                batchCompareState = .error
                 isBatchComparing = false
                 return
             }
@@ -293,6 +341,7 @@ class AppState: ObservableObject {
             for (index, targetPhoto) in targetPhotos.enumerated() {
                 let progress = Double(index) / Double(targetPhotos.count)
                 batchCompareProgress = progress
+                matchesAttempted = index + 1
                 
                 if FeatureFlags.enableDebugLogFaceDetection {
                     print("[AppState] Comparing target \(index + 1)/\(targetPhotos.count): \(targetPhoto.mediaItemId)")
@@ -301,8 +350,13 @@ class AppState: ObservableObject {
                 do {
                     // Convert target photo to image data
                     guard let targetImageData = await convertPhotoToImageData(targetPhoto) else {
+                        if FeatureFlags.enableDebugBatchCompareModal {
+                            print("[BatchCompareModal] Failed to load target image data for: \(targetPhoto.mediaItemId)")
+                            print("[BatchCompareModal] Target photo URL: \(targetPhoto.baseUrl)")
+                        }
                         let errorResult = BatchCompareResult(
                             targetFileName: targetPhoto.mediaItemId,
+                            photo: targetPhoto,
                             faceMatches: [],
                             unmatchedFaces: [],
                             sourceFaceCount: 0,
@@ -321,8 +375,15 @@ class AppState: ObservableObject {
                         targetImageData: targetImageData
                     )
                     
+                    if FeatureFlags.enableDebugBatchCompareModal {
+                        print("[BatchCompareModal] Creating batch result for: \(targetPhoto.mediaItemId)")
+                        print("[BatchCompareModal] Photo URL: \(targetPhoto.baseUrl)")
+                        print("[BatchCompareModal] Face matches: \(comparisonResult.faceMatches.count)")
+                    }
+                    
                     let batchResult = BatchCompareResult(
                         targetFileName: targetPhoto.mediaItemId,
+                        photo: targetPhoto,
                         faceMatches: comparisonResult.faceMatches,
                         unmatchedFaces: comparisonResult.unmatchedFaces,
                         sourceFaceCount: comparisonResult.sourceFaceCount,
@@ -346,6 +407,7 @@ class AppState: ObservableObject {
                     
                     let errorResult = BatchCompareResult(
                         targetFileName: targetPhoto.mediaItemId,
+                        photo: targetPhoto,
                         faceMatches: [],
                         unmatchedFaces: [],
                         sourceFaceCount: 0,
@@ -368,8 +430,21 @@ class AppState: ObservableObject {
             // Set error message if all comparisons failed
             if failedComparisons == targetPhotos.count && targetPhotos.count > 0 {
                 batchCompareError = "All \(targetPhotos.count) image comparisons failed"
+                batchCompareState = .error
+                if FeatureFlags.enableDebugBatchCompareModal {
+                    print("[BatchCompareModal] State transition: MATCHING → ERROR (all failed)")
+                }
             } else if failedComparisons > 0 {
                 batchCompareError = "\(failedComparisons) of \(targetPhotos.count) comparisons had issues"
+                batchCompareState = .matched
+                if FeatureFlags.enableDebugBatchCompareModal {
+                    print("[BatchCompareModal] State transition: MATCHING → MATCHED (partial success)")
+                }
+            } else {
+                batchCompareState = .matched
+                if FeatureFlags.enableDebugBatchCompareModal {
+                    print("[BatchCompareModal] State transition: MATCHING → MATCHED (all successful)")
+                }
             }
             
         } catch {
@@ -377,6 +452,10 @@ class AppState: ObservableObject {
                 print("[AppState] Error during batch compare: \(error)")
             }
             batchCompareError = error.localizedDescription
+            batchCompareState = .error
+            if FeatureFlags.enableDebugBatchCompareModal {
+                print("[BatchCompareModal] State transition: MATCHING → ERROR (exception)")
+            }
         }
         
         isBatchComparing = false
@@ -389,6 +468,40 @@ class AppState: ObservableObject {
         batchCompareError = nil
         batchCompareProgress = 0.0
         isBatchComparing = false
+        matchesAttempted = 0
+        batchCompareState = .waiting
+    }
+    
+    func confirmMatches() async {
+        guard let currentUser = currentUser else {
+            return
+        }
+        
+        let matchingResults = batchCompareResults.filter { !$0.faceMatches.isEmpty }
+        
+        if matchingResults.isEmpty {
+            return
+        }
+        
+        var successfulUpdates = 0
+        var failedUpdates = 0
+        
+        for result in matchingResults {
+            do {
+                let updatedPhoto = try await photosService.updatePhotoSubject(
+                    mediaItemId: result.photo.mediaItemId,
+                    photoOf: currentUser.id
+                )
+                
+                // Update the photo in our local photos array
+                await updateSinglePhotoMetadata(updatedPhoto)
+                
+                successfulUpdates += 1
+                
+            } catch {
+                failedUpdates += 1
+            }
+        }
     }
     
     private func convertPhotoToImageData(_ photo: Photo) async -> Data? {

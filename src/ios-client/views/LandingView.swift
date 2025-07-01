@@ -1,8 +1,12 @@
 import SwiftUI
+import GoogleSignInSwift
 
 struct LandingView: View {
     @EnvironmentObject var appState: AppState
     @State private var showSkipAuthModal = false
+    @State private var isSigningIn = false
+    @State private var showAuthError = false
+    @State private var authErrorMessage = ""
     
     let galleryImages: [GalleryImage] = [
         GalleryImage(id: "gallery-2", url: "https://play.rosebud.ai/assets/jules-02.jpg?8JqA", alt: "Group fun photo", friendPfp: "https://play.rosebud.ai/assets/friend-2-v2.png?itRQ", userPfp: "https://rosebud.ai/assets/jules-pfp.jpg?zlHT"),
@@ -87,26 +91,52 @@ struct LandingView: View {
                             )
                         }
                         // Sign-in CTA
-                        Button(action: {
+                        VStack(spacing: 16) {
                             if FeatureFlags.enableSkipAuthFlow {
-                                showSkipAuthModal = true
+                                Button(action: {
+                                    showSkipAuthModal = true
+                                }) {
+                                    HStack(spacing: 12) {
+                                        Image(systemName: "globe")
+                                            .resizable()
+                                            .frame(width: 22, height: 22)
+                                        Text("Sign in with Google")
+                                            .font(.headline)
+                                    }
+                                    .padding(.vertical, 16)
+                                    .padding(.horizontal, 40)
+                                    .background(Color.primaryColorDark)
+                                    .foregroundColor(.white)
+                                    .cornerRadius(30)
+                                    .shadow(color: .neumorphicShadow.opacity(0.5), radius: 8, x: 4, y: 4)
+                                }
                             } else {
-                                appState.handleAuthSuccess() // Stub: replace with real auth later
+                                // Real Google Sign-In Button
+                                GoogleSignInButton(action: {
+                                    isSigningIn = true
+                                    Task {
+                                        do {
+                                            try await appState.handleGoogleSignIn()
+                                        } catch {
+                                            authErrorMessage = error.localizedDescription
+                                            showAuthError = true
+                                        }
+                                        isSigningIn = false
+                                    }
+                                })
+                                .frame(height: 50)
+                                .cornerRadius(25)
+                                .disabled(isSigningIn)
+                                .overlay(
+                                    Group {
+                                        if isSigningIn {
+                                            ProgressView()
+                                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                                .scaleEffect(0.8)
+                                        }
+                                    }
+                                )
                             }
-                        }) {
-                            HStack(spacing: 12) {
-                                Image(systemName: "globe") // Replace with Google icon asset if available
-                                    .resizable()
-                                    .frame(width: 22, height: 22)
-                                Text("Sign in with Google")
-                                    .font(.headline)
-                            }
-                            .padding(.vertical, 16)
-                            .padding(.horizontal, 40)
-                            .background(Color.primaryColorDark)
-                            .foregroundColor(.white)
-                            .cornerRadius(30)
-                            .shadow(color: .neumorphicShadow.opacity(0.5), radius: 8, x: 4, y: 4)
                         }
                         .padding(.top, 16)
                         Spacer(minLength: 0)
@@ -166,6 +196,13 @@ struct LandingView: View {
                     )
                 }
             }
+        }
+        .alert("Sign-In Error", isPresented: $showAuthError) {
+            Button("OK") {
+                showAuthError = false
+            }
+        } message: {
+            Text(authErrorMessage)
         }
     }
     

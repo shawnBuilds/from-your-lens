@@ -7,6 +7,7 @@ protocol PhotosServiceProtocol {
     func fetchPhotosOfUser(userId: String) async throws -> PhotosResult
     func loadMorePhotosOfUser(userId: String, offset: Int) async throws -> PhotosResult
     func updatePhotoMetadata(_ photo: Photo) async throws -> Photo
+    func updatePhotoSubject(mediaItemId: String, photoOf: Int?) async throws -> Photo
 }
 
 class PhotosService: PhotosServiceProtocol {
@@ -72,6 +73,34 @@ class PhotosService: PhotosServiceProtocol {
         // TODO: Implement actual API call
         // For now, return the same photo
         return photo
+    }
+    
+    func updatePhotoSubject(mediaItemId: String, photoOf: Int?) async throws -> Photo {
+        // Simulate network delay
+        try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+        
+        // TODO: Implement actual API call to PATCH /api/photos/:mediaItemId/photo-of
+        // For now, return a mock updated photo
+        let mockPhoto = Photo.mockPhotos.first { $0.mediaItemId == mediaItemId } ?? Photo.mockPhotos[0]
+        
+        // Create updated photo with new photoOf value
+        let updatedPhoto = Photo(
+            id: mockPhoto.id,
+            mediaItemId: mockPhoto.mediaItemId,
+            userId: mockPhoto.userId,
+            photoOf: photoOf,
+            altText: mockPhoto.altText,
+            tags: mockPhoto.tags,
+            baseUrl: mockPhoto.baseUrl,
+            mimeType: mockPhoto.mimeType,
+            width: mockPhoto.width,
+            height: mockPhoto.height,
+            creationTime: mockPhoto.creationTime,
+            createdAt: mockPhoto.createdAt,
+            updatedAt: Date()
+        )
+        
+        return updatedPhoto
     }
     
     // MARK: - iCloud Photo Methods

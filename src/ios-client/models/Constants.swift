@@ -9,7 +9,7 @@ struct FeatureFlags {
     static let enableGoogleDriveUsage = false
     static let enableSkipAuthFlow = true // Set to true to enable the "skip auth" modal for development
     static let enableDebugLogSkipAuth = false // Debug: log state changes for skip auth/test data
-    static let enableDebugLogPhotoGallery = true // Debug: log data shown in photo gallery
+    static let enableDebugLogPhotoGallery = false // Debug: log data shown in photo gallery
     static let enableDebugLogLandingView = false // Debug: log layout info for landing view
     static let enableLandingGalleryImages = true // Toggle gallery images section in LandingView
     static let enableLandingHowItWorks = true // Toggle how it works section in LandingView
@@ -22,7 +22,8 @@ struct FeatureFlags {
     
     // MARK: - Face Detection Integration
     static let enableFaceDetectionUsage = true // Master switch for face detection functionality
-    static let enableDebugLogFaceDetection = true // Debug: log face detection operations
+    static let enableDebugLogFaceDetection = false // Debug: log face detection operations
+    static let enableDebugBatchCompareModal = false // Debug: log batch compare modal operations
     static let faceDetectionSimilarityThreshold = 90.0 // Minimum similarity threshold for face matching
     static let maxImageSizeForFaceDetection = 5 * 1024 * 1024 // 5MB max image size for face detection
     static let minImageSizeForFaceDetection = 1 * 1024 // 1KB min image size for face detection
@@ -45,6 +46,24 @@ struct APIConfig {
     static let profilePicURL = "https://rosebud.ai/assets/icon-default-pfp.png?ibhI"
 }
 
+// MARK: - Google OAuth Configuration
+struct GoogleOAuthConfig {
+    // MARK: - Client Configuration
+    static let clientID = "374611061345-5op1h3i3pp2a53jo7t71e705qvomg5m4.apps.googleusercontent.com"
+    
+    // MARK: - Server Configuration
+    static let serverURL: String = {
+        if APIConfig.useProductionServer {
+            return "https://fromyourlens-904e01076638.herokuapp.com"
+        } else {
+            return "http://localhost:5000"
+        }
+    }()
+    
+    // MARK: - URL Scheme
+    static let urlScheme = "fromyourlens"
+}
+
 // MARK: - Storage Keys
 struct StorageKeys {
     static let authToken = "from-your-lens-authToken-v1"
@@ -64,9 +83,17 @@ enum ViewState: String, CaseIterable {
     case testing = "TESTING"
 }
 
+// MARK: - Batch Compare States
+enum BatchCompareState: String, CaseIterable {
+    case waiting = "WAITING"      // Initial state - waiting for user to start
+    case matching = "MATCHING"    // Face matching in progress
+    case matched = "MATCHED"      // Matching completed with results
+    case error = "ERROR"          // Error occurred during matching
+}
+
 // MARK: - Icon URLs
 struct IconURLs {
-    static let myDrive = "https://play.rosebud.ai/assets/icon-google-drive-transparent.png?4rTm"
+    static let allPhotos = "https://rosebud.ai/assets/iCloud-icon.png?qh8y"
     static let photosOfYou = "https://play.rosebud.ai/assets/icon-you-selfie.png?MQtz"
     static let findPhotos = "https://play.rosebud.ai/assets/icon-search.png?mQKb"
     static let sendPhotos = "https://play.rosebud.ai/assets/icon-send-no-bg.png?b4PE"

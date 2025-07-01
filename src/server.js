@@ -1,6 +1,8 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const passport = require('passport');
+const session = require('express-session');
 const pool = require('../db/pool');
 const { initializeDatabase } = require('../db/users');
 const Controls = require('./controls');
@@ -29,6 +31,17 @@ app.use(cors({
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Session configuration for OAuth
+app.use(session({
+    secret: process.env.SESSION_SECRET || 'your-session-secret',
+    resave: false,
+    saveUninitialized: false,
+    cookie: { secure: process.env.NODE_ENV === 'production' }
+}));
+
+// Initialize Passport
+app.use(passport.initialize());
 
 // Routes
 app.use('/auth', authRoutes);

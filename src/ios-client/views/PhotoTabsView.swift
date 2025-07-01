@@ -8,7 +8,7 @@ enum PhotoTabType: String, CaseIterable, Identifiable {
     var icon: String {
         switch self {
         case .allPhotos:
-            return IconURLs.myDrive
+            return IconURLs.allPhotos
         case .photosOfYou:
             return IconURLs.photosOfYou
         }

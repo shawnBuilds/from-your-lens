@@ -34,8 +34,14 @@
 		294C4D302E0C8BD3004CF461 /* MatchingTabsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 294C4D2D2E0C8BD2004CF461 /* MatchingTabsView.swift */; };
 		294C4D312E0C8BD3004CF461 /* Color+Palette.swift in Sources */ = {isa = PBXBuildFile; fileRef = 294C4D2E2E0C8BD2004CF461 /* Color+Palette.swift */; };
 		295AEC162E0DC24900D87103 /* ICloudPhotoService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 295AEC152E0DC24800D87103 /* ICloudPhotoService.swift */; };
+		297180022E14384C00366BF4 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = 297180012E14384C00366BF4 /* GoogleSignIn */; };
+		297180042E14384C00366BF4 /* GoogleSignInSwift in Frameworks */ = {isa = PBXBuildFile; productRef = 297180032E14384C00366BF4 /* GoogleSignInSwift */; };
+		297180072E143FB400366BF4 /* GoogleOAuthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 297180062E143FB300366BF4 /* GoogleOAuthService.swift */; };
 		29AE9B712E0EEF6300B4CB91 /* FaceApiService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29AE9B702E0EEF6300B4CB91 /* FaceApiService.swift */; };
 		29AE9B732E0EEF7600B4CB91 /* BatchCompareModal.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29AE9B722E0EEF7600B4CB91 /* BatchCompareModal.swift */; };
+		29D1F6342E13056900A68FE9 /* TargetPhotosCarouselView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29D1F6332E13056900A68FE9 /* TargetPhotosCarouselView.swift */; };
+		29D1F6362E13081100A68FE9 /* BaseCarouselView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29D1F6352E13081100A68FE9 /* BaseCarouselView.swift */; };
+		29D1F6382E13109A00A68FE9 /* FaceMatchingProgressBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29D1F6372E13109A00A68FE9 /* FaceMatchingProgressBar.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -87,8 +93,13 @@
 		294C4D2E2E0C8BD2004CF461 /* Color+Palette.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "Color+Palette.swift"; sourceTree = "<group>"; };
 		295AEC152E0DC24800D87103 /* ICloudPhotoService.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ICloudPhotoService.swift; sourceTree = "<group>"; };
 		295AEC172E0DC5DE00D87103 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		297180052E143D6B00366BF4 /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
+		297180062E143FB300366BF4 /* GoogleOAuthService.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = GoogleOAuthService.swift; sourceTree = "<group>"; };
 		29AE9B702E0EEF6300B4CB91 /* FaceApiService.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = FaceApiService.swift; sourceTree = "<group>"; };
 		29AE9B722E0EEF7600B4CB91 /* BatchCompareModal.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BatchCompareModal.swift; sourceTree = "<group>"; };
+		29D1F6332E13056900A68FE9 /* TargetPhotosCarouselView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = TargetPhotosCarouselView.swift; sourceTree = "<group>"; };
+		29D1F6352E13081100A68FE9 /* BaseCarouselView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BaseCarouselView.swift; sourceTree = "<group>"; };
+		29D1F6372E13109A00A68FE9 /* FaceMatchingProgressBar.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = FaceMatchingProgressBar.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -96,6 +107,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				297180022E14384C00366BF4 /* GoogleSignIn in Frameworks */,
+				297180042E14384C00366BF4 /* GoogleSignInSwift in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -119,6 +132,7 @@
 		294C4C2B2E0AE38C004CF461 = {
 			isa = PBXGroup;
 			children = (
+				297180052E143D6B00366BF4 /* GoogleService-Info.plist */,
 				295AEC172E0DC5DE00D87103 /* Info.plist */,
 				294C4C932E0AE968004CF461 /* ios-client */,
 				294C4C362E0AE38C004CF461 /* FromYourLens */,
@@ -187,6 +201,7 @@
 		294C4C8E2E0AE968004CF461 /* services */ = {
 			isa = PBXGroup;
 			children = (
+				297180062E143FB300366BF4 /* GoogleOAuthService.swift */,
 				29AE9B702E0EEF6300B4CB91 /* FaceApiService.swift */,
 				295AEC152E0DC24800D87103 /* ICloudPhotoService.swift */,
 				294C4C8B2E0AE968004CF461 /* AuthService.swift */,
@@ -207,6 +222,9 @@
 		294C4C922E0AE968004CF461 /* views */ = {
 			isa = PBXGroup;
 			children = (
+				29D1F6372E13109A00A68FE9 /* FaceMatchingProgressBar.swift */,
+				29D1F6352E13081100A68FE9 /* BaseCarouselView.swift */,
+				29D1F6332E13056900A68FE9 /* TargetPhotosCarouselView.swift */,
 				29AE9B722E0EEF7600B4CB91 /* BatchCompareModal.swift */,
 				294C4D2E2E0C8BD2004CF461 /* Color+Palette.swift */,
 				294C4D2D2E0C8BD2004CF461 /* MatchingTabsView.swift */,
@@ -260,6 +278,10 @@
 			dependencies = (
 			);
 			name = FromYourLens;
+			packageProductDependencies = (
+				297180012E14384C00366BF4 /* GoogleSignIn */,
+				297180032E14384C00366BF4 /* GoogleSignInSwift */,
+			);
 			productName = FromYourLens;
 			productReference = 294C4C342E0AE38C004CF461 /* FromYourLens.app */;
 			productType = "com.apple.product-type.application";
@@ -332,6 +354,9 @@
 				Base,
 			);
 			mainGroup = 294C4C2B2E0AE38C004CF461;
+			packageReferences = (
+				297180002E14384C00366BF4 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
+			);
 			productRefGroup = 294C4C352E0AE38C004CF461 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -384,17 +409,21 @@
 				294C4C9A2E0AE968004CF461 /* AppState.swift in Sources */,
 				294C4D0F2E0AF9C0004CF461 /* AppView.swift in Sources */,
 				294C4C972E0AE968004CF461 /* AuthService.swift in Sources */,
+				29D1F6362E13081100A68FE9 /* BaseCarouselView.swift in Sources */,
 				295AEC162E0DC24900D87103 /* ICloudPhotoService.swift in Sources */,
 				294C4C992E0AE968004CF461 /* UserService.swift in Sources */,
 				294C4D312E0C8BD3004CF461 /* Color+Palette.swift in Sources */,
 				294C4C982E0AE968004CF461 /* PhotosService.swift in Sources */,
 				294C4D112E0B1370004CF461 /* LandingView.swift in Sources */,
+				29D1F6342E13056900A68FE9 /* TargetPhotosCarouselView.swift in Sources */,
+				297180072E143FB400366BF4 /* GoogleOAuthService.swift in Sources */,
 				29AE9B732E0EEF7600B4CB91 /* BatchCompareModal.swift in Sources */,
 				294C4C962E0AE968004CF461 /* User.swift in Sources */,
 				294C4C942E0AE968004CF461 /* APIResults.swift in Sources */,
 				294C4D0D2E0AF913004CF461 /* Constants.swift in Sources */,
 				294C4D172E0B15BA004CF461 /* LoadingView.swift in Sources */,
 				294C4D262E0C705A004CF461 /* PhotoGalleryView.swift in Sources */,
+				29D1F6382E13109A00A68FE9 /* FaceMatchingProgressBar.swift in Sources */,
 				29AE9B712E0EEF6300B4CB91 /* FaceApiService.swift in Sources */,
 				294C4D232E0C6C39004CF461 /* SkipAuthModal.swift in Sources */,
 				294C4D162E0B15BA004CF461 /* PhotosView.swift in Sources */,
@@ -725,6 +754,30 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		297180002E14384C00366BF4 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/google/GoogleSignIn-iOS";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 8.0.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		297180012E14384C00366BF4 /* GoogleSignIn */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 297180002E14384C00366BF4 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
+			productName = GoogleSignIn;
+		};
+		297180032E14384C00366BF4 /* GoogleSignInSwift */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 297180002E14384C00366BF4 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
+			productName = GoogleSignInSwift;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 294C4C2C2E0AE38C004CF461 /* Project object */;
 }

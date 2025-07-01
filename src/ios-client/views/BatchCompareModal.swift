@@ -9,9 +9,16 @@ struct BatchCompareModal: View {
     @State private var showingSourcePhotoPicker = false
     @State private var showingTargetPhotoPicker = false
     
+    // Auto-populate target photos when modal appears
+    private var autoPopulatedTargetPhotos: [Photo] {
+        let allPhotos = appState.photos
+        let maxCount = FeatureFlags.defaultBatchTargetCount
+        return Array(allPhotos.prefix(maxCount))
+    }
+    
     var body: some View {
         ZStack {
-            Color.black.opacity(0.4)
+            Color.secondaryColor
                 .ignoresSafeArea()
             
             VStack(spacing: 0) {
@@ -19,36 +26,48 @@ struct BatchCompareModal: View {
                 
                 ScrollView {
                     VStack(spacing: 24) {
-                        SourcePhotoSection(
-                            selectedSourcePhoto: $selectedSourcePhoto,
-                            showingSourcePhotoPicker: $showingSourcePhotoPicker
-                        )
-                        
-                        TargetPhotosSection(
-                            selectedTargetPhotos: $selectedTargetPhotos,
-                            showingTargetPhotoPicker: $showingTargetPhotoPicker
-                        )
-                        
-                        ProgressSection(appState: appState)
-                        
-                        ErrorSection(error: appState.batchCompareError)
-                        
-                        ResultsSection(results: appState.batchCompareResults)
-                        
-                        ActionButtonsSection(
-                            selectedSourcePhoto: selectedSourcePhoto,
-                            selectedTargetPhotos: selectedTargetPhotos,
-                            appState: appState,
-                            isPresented: $isPresented
-                        )
+                        // State-based content
+                        switch appState.batchCompareState {
+                        case .waiting:
+                            WaitingStateContent(
+                                selectedSourcePhoto: $selectedSourcePhoto,
+                                selectedTargetPhotos: $selectedTargetPhotos,
+                                showingSourcePhotoPicker: $showingSourcePhotoPicker,
+                                showingTargetPhotoPicker: $showingTargetPhotoPicker,
+                                autoPopulatedPhotos: autoPopulatedTargetPhotos,
+                                appState: appState
+                            )
+                        case .matching:
+                            MatchingStateContent(
+                                selectedSourcePhoto: selectedSourcePhoto,
+                                selectedTargetPhotos: selectedTargetPhotos,
+                                appState: appState
+                            )
+                        case .matched:
+                            MatchedStateContent(
+                                selectedSourcePhoto: selectedSourcePhoto,
+                                selectedTargetPhotos: selectedTargetPhotos,
+                                appState: appState,
+                                isPresented: $isPresented
+                            )
+                        case .error:
+                            ErrorStateContent(
+                                selectedSourcePhoto: selectedSourcePhoto,
+                                selectedTargetPhotos: selectedTargetPhotos,
+                                appState: appState,
+                                isPresented: $isPresented
+                            )
+                        }
                     }
-                    .padding(24)
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 32)
                 }
-                .background(Color(.systemBackground))
+                .background(Color.secondaryColor)
             }
-            .frame(maxWidth: 500, maxHeight: 600)
+            .frame(maxWidth: 500, maxHeight: .infinity)
+            .padding(.vertical, 0)
             .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-            .shadow(radius: 16)
+            .shadow(color: Color.neumorphicShadow.opacity(0.18), radius: 8, x: 0, y: 4)
         }
         .sheet(isPresented: $showingSourcePhotoPicker) {
             PhotoPickerView(selectedPhotos: Binding(
@@ -61,6 +80,17 @@ struct BatchCompareModal: View {
         .sheet(isPresented: $showingTargetPhotoPicker) {
             PhotoPickerView(selectedPhotos: $selectedTargetPhotos, maxSelection: 10, title: "Choose Target Photos")
         }
+        .onAppear {
+            // Auto-populate target photos when modal appears
+            selectedTargetPhotos = autoPopulatedTargetPhotos
+            
+            if FeatureFlags.enableDebugBatchCompareModal {
+                print("[BatchCompareModal] Modal appeared with \(appState.batchCompareResults.count) batch compare results")
+                for (index, result) in appState.batchCompareResults.enumerated() {
+                    print("[BatchCompareModal] Result \(index): \(result.targetFileName), has photo: \(result.photo.baseUrl)")
+                }
+            }
+        }
     }
 }
 
@@ -72,7 +102,8 @@ struct BatchCompareModalHeader: View {
     var body: some View {
         HStack {
             Text("Find Photos of You")
-                .font(.headline)
+                .font(.system(size: 28, weight: .bold))
+                .foregroundColor(.textColorPrimary)
                 .padding(.leading)
             Spacer()
             Button(action: { 
@@ -80,13 +111,17 @@ struct BatchCompareModalHeader: View {
                 appState.resetBatchCompare()
             }) {
                 Image(systemName: "xmark")
-                    .foregroundColor(.secondary)
-                    .padding(8)
+                    .font(.system(size: 28, weight: .bold))
+                    .foregroundColor(.textColorSecondary)
+                    .frame(width: 44, height: 44)
+                    .background(Color.primaryColor.opacity(0.12))
+                    .clipShape(Circle())
             }
             .accessibilityLabel("Close")
+            .padding(.trailing, 16)
         }
-        .padding(.vertical, 12)
-        .background(Color(.systemBackground))
+        .padding(.vertical, 28)
+        .background(Color.secondaryColor)
         Divider()
     }
 }
@@ -98,9 +133,14 @@ struct SourcePhotoSection: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Photo of You")
-                .font(.subheadline)
-                .fontWeight(.semibold)
+            HStack {
+                Spacer()
+                Text("Photo of You")
+                    .font(.headline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.textColorPrimary)
+                Spacer()
+            }
             
             if let sourcePhoto = selectedSourcePhoto {
                 SourcePhotoSelectedView(sourcePhoto: sourcePhoto) {
@@ -121,6 +161,7 @@ struct SourcePhotoSelectedView: View {
     
     var body: some View {
         HStack {
+            Spacer()
             AsyncImage(url: URL(string: sourcePhoto.baseUrl)) { image in
                 image
                     .resizable()
@@ -131,21 +172,7 @@ struct SourcePhotoSelectedView: View {
             }
             .frame(width: 80, height: 80)
             .clipShape(RoundedRectangle(cornerRadius: 8))
-            
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Selected Source Photo")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                Text(sourcePhoto.mediaItemId)
-                    .font(.caption)
-                    .lineLimit(1)
-            }
-            
             Spacer()
-            
-            Button("Change", action: onChange)
-                .font(.caption)
-                .foregroundColor(.blue)
         }
     }
 }
@@ -161,98 +188,18 @@ struct SourcePhotoPickerButton: View {
             }
             .frame(maxWidth: .infinity)
             .padding()
-            .background(Color.blue.opacity(0.1))
-            .foregroundColor(.blue)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .background(Color.primaryColor.opacity(0.1))
+            .foregroundColor(Color.primaryColorDark)
+            .clipShape(RoundedRectangle(cornerRadius: 22))
+            .shadow(color: Color.neumorphicShadow.opacity(0.18), radius: 4, x: 0, y: 2)
         }
     }
 }
 
-// MARK: - Target Photos Section
-struct TargetPhotosSection: View {
-    @Binding var selectedTargetPhotos: [Photo]
-    @Binding var showingTargetPhotoPicker: Bool
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Photos to Search")
-                .font(.subheadline)
-                .fontWeight(.semibold)
-            
-            if !selectedTargetPhotos.isEmpty {
-                TargetPhotosListView(selectedTargetPhotos: $selectedTargetPhotos)
-                
-                Button("Add More Photos") {
-                    showingTargetPhotoPicker = true
-                }
-                .font(.caption)
-                .foregroundColor(.blue)
-            } else {
-                TargetPhotoPickerButton {
-                    showingTargetPhotoPicker = true
-                }
-            }
-        }
-    }
-}
-
-struct TargetPhotosListView: View {
-    @Binding var selectedTargetPhotos: [Photo]
-    
-    var body: some View {
-        VStack(spacing: 8) {
-            ForEach(selectedTargetPhotos, id: \.id) { photo in
-                TargetPhotoItemView(photo: photo) {
-                    selectedTargetPhotos.removeAll { $0.id == photo.id }
-                }
-            }
-        }
-    }
-}
-
-struct TargetPhotoItemView: View {
-    let photo: Photo
-    let onRemove: () -> Void
-    
-    var body: some View {
-        HStack {
-            AsyncImage(url: URL(string: photo.baseUrl)) { image in
-                image
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-            } placeholder: {
-                Rectangle()
-                    .fill(Color.gray.opacity(0.3))
-            }
-            .frame(width: 60, height: 60)
-            .clipShape(RoundedRectangle(cornerRadius: 6))
-            
-            VStack(alignment: .leading, spacing: 2) {
-                Text(photo.mediaItemId)
-                    .font(.caption)
-                    .lineLimit(1)
-                Text("\(photo.width ?? 0) × \(photo.height ?? 0)")
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
-            }
-            
-            Spacer()
-            
-            Button(action: onRemove) {
-                Image(systemName: "xmark.circle.fill")
-                    .foregroundColor(.red)
-            }
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(Color.gray.opacity(0.1))
-        .clipShape(RoundedRectangle(cornerRadius: 6))
-    }
-}
-
+// MARK: - Target Photo Picker Button
 struct TargetPhotoPickerButton: View {
     let action: () -> Void
-    
+
     var body: some View {
         Button(action: action) {
             HStack {
@@ -261,9 +208,46 @@ struct TargetPhotoPickerButton: View {
             }
             .frame(maxWidth: .infinity)
             .padding()
-            .background(Color.green.opacity(0.1))
-            .foregroundColor(.green)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .background(Color.primaryColor.opacity(0.1))
+            .foregroundColor(Color.primaryColorDark)
+            .clipShape(RoundedRectangle(cornerRadius: 22))
+            .shadow(color: Color.neumorphicShadow.opacity(0.18), radius: 4, x: 0, y: 2)
+        }
+    }
+}
+
+// MARK: - Target Photos Section
+struct TargetPhotosSection: View {
+    @Binding var selectedTargetPhotos: [Photo]
+    @Binding var showingTargetPhotoPicker: Bool
+    let autoPopulatedPhotos: [Photo]
+    @State private var carouselIndex: Int = 0
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Spacer()
+                Text("Photos to Search")
+                    .font(.headline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.textColorPrimary)
+                Spacer()
+            }
+            if !selectedTargetPhotos.isEmpty {
+                TargetPhotosCarouselView(
+                    photos: $selectedTargetPhotos,
+                    carouselIndex: $carouselIndex
+                )
+            } else {
+                TargetPhotoPickerButton {
+                    showingTargetPhotoPicker = true
+                }
+            }
+        }
+        .onAppear {
+            if FeatureFlags.enableDebugLogFaceDetection {
+                print("[TargetPhotosSection] Displaying \(selectedTargetPhotos.count) selected photos out of \(autoPopulatedPhotos.count) auto-populated photos")
+            }
         }
     }
 }
@@ -280,36 +264,10 @@ struct ProgressSection: View {
                 
                 Text("Comparing photos... \(Int(appState.batchCompareProgress * 100))%")
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(.textColorSecondary)
             }
             .padding()
-            .background(Color.blue.opacity(0.1))
-            .clipShape(RoundedRectangle(cornerRadius: 8))
-        }
-    }
-}
-
-// MARK: - Error Section
-struct ErrorSection: View {
-    let error: String?
-    
-    var body: some View {
-        if let error = error {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundColor(.orange)
-                    Text("Comparison Issues")
-                        .font(.subheadline)
-                        .fontWeight(.semibold)
-                }
-                
-                Text(error)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-            .padding()
-            .background(Color.orange.opacity(0.1))
+            .background(Color.primaryColor.opacity(0.1))
             .clipShape(RoundedRectangle(cornerRadius: 8))
         }
     }
@@ -318,66 +276,66 @@ struct ErrorSection: View {
 // MARK: - Results Section
 struct ResultsSection: View {
     let results: [BatchCompareResult]
+    @State private var carouselIndex: Int = 0
+    
+    var matchingResults: [BatchCompareResult] {
+        results.filter { !$0.faceMatches.isEmpty }
+    }
     
     var body: some View {
         if !results.isEmpty {
             VStack(alignment: .leading, spacing: 12) {
-                Text("Results")
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
-                
-                let matchingResults = results.filter { !$0.faceMatches.isEmpty }
-                let totalResults = results.count
-                
-                VStack(spacing: 8) {
-                    HStack {
-                        Text("Found \(matchingResults.count) matching photos")
-                            .font(.caption)
-                            .foregroundColor(.green)
-                        Spacer()
-                        Text("of \(totalResults) total")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                if !matchingResults.isEmpty {
+                    BaseCarouselView(items: matchingResults, currentIndex: $carouselIndex) { result in
+                        ZStack(alignment: .topTrailing) {
+                            AsyncImage(url: URL(string: result.photo.baseUrl)) { image in
+                                image
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                            } placeholder: {
+                                Rectangle()
+                                    .fill(Color.gray.opacity(0.3))
+                            }
+                            .frame(width: 220, height: 220)
+                            .clipShape(RoundedRectangle(cornerRadius: 16))
+                            
+                            // Overlay X button for removing matching results
+                            Button(action: {
+                                if let index = matchingResults.firstIndex(where: { $0.id == result.id }) {
+                                    if FeatureFlags.enableDebugBatchCompareModal {
+                                        print("[BatchCompareModal] Removing matching result: \(result.targetFileName)")
+                                    }
+                                    // Note: This would need to be implemented in AppState to actually remove from results
+                                }
+                            }) {
+                                Image(systemName: "xmark.circle.fill")
+                                    .foregroundColor(.red)
+                                    .font(.system(size: 32, weight: .bold))
+                                    .background(Color.white.opacity(0.8))
+                                    .clipShape(Circle())
+                                    .padding(6)
+                            }
+                            .offset(x: -8, y: 8)
+                        }
+                        .frame(width: 220, height: 220)
+                        .shadow(color: Color.neumorphicShadow.opacity(0.18), radius: 8, x: 0, y: 4)
                     }
-                    
-                    ForEach(results, id: \.targetFileName) { result in
-                        ResultItemView(result: result)
+                    .onAppear {
+                        if FeatureFlags.enableDebugBatchCompareModal {
+                            print("[BatchCompareModal] Displaying \(matchingResults.count) matching results")
+                            for (index, result) in matchingResults.enumerated() {
+                                print("[BatchCompareModal] Result \(index): \(result.targetFileName), URL: \(result.photo.baseUrl)")
+                            }
+                        }
                     }
+                } else {
+                    Text("No matching images found.")
+                        .font(.caption)
+                        .foregroundColor(.textColorSecondary)
+                        .padding(.vertical, 12)
                 }
             }
         }
-    }
-}
-
-struct ResultItemView: View {
-    let result: BatchCompareResult
-    
-    var body: some View {
-        HStack {
-            Text(result.targetFileName)
-                .font(.caption)
-                .lineLimit(1)
-            
-            Spacer()
-            
-            if result.rejected {
-                Text("Failed to load")
-                    .font(.caption2)
-                    .foregroundColor(.red)
-            } else if !result.faceMatches.isEmpty {
-                Text("Match (\(Int(result.faceMatches.first?.similarity ?? 0))%)")
-                    .font(.caption2)
-                    .foregroundColor(.green)
-            } else {
-                Text("No match")
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
-            }
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 6)
-        .background(Color.gray.opacity(0.05))
-        .clipShape(RoundedRectangle(cornerRadius: 4))
     }
 }
 
@@ -405,9 +363,10 @@ struct ActionButtonsSection: View {
                     }
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(Color.blue)
+                    .background(Color.primaryColor)
                     .foregroundColor(.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .clipShape(RoundedRectangle(cornerRadius: 22))
+                    .shadow(color: Color.neumorphicShadow.opacity(0.18), radius: 4, x: 0, y: 2)
                 }
             }
             
@@ -419,9 +378,10 @@ struct ActionButtonsSection: View {
                     Text("Done")
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(Color.gray.opacity(0.2))
-                        .foregroundColor(.primary)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .background(Color.neumorphicShadow.opacity(0.3))
+                        .foregroundColor(Color.textColorPrimary)
+                        .clipShape(RoundedRectangle(cornerRadius: 22))
+                        .shadow(color: Color.neumorphicShadow.opacity(0.18), radius: 4, x: 0, y: 2)
                 }
             }
         }
@@ -547,4 +507,210 @@ struct PhotoPickerItemView: View {
 #Preview {
     BatchCompareModal(isPresented: .constant(true))
         .environmentObject(AppState())
+}
+
+// MARK: - State-Based Content Components
+
+// MARK: - Waiting State Content
+struct WaitingStateContent: View {
+    @Binding var selectedSourcePhoto: Photo?
+    @Binding var selectedTargetPhotos: [Photo]
+    @Binding var showingSourcePhotoPicker: Bool
+    @Binding var showingTargetPhotoPicker: Bool
+    let autoPopulatedPhotos: [Photo]
+    let appState: AppState
+    
+    var body: some View {
+        VStack(spacing: 24) {
+            SourcePhotoSection(
+                selectedSourcePhoto: $selectedSourcePhoto,
+                showingSourcePhotoPicker: $showingSourcePhotoPicker
+            )
+            
+            TargetPhotosSection(
+                selectedTargetPhotos: $selectedTargetPhotos,
+                showingTargetPhotoPicker: $showingTargetPhotoPicker,
+                autoPopulatedPhotos: autoPopulatedPhotos
+            )
+            
+            // Start button
+            if selectedSourcePhoto != nil && !selectedTargetPhotos.isEmpty {
+                Button(action: {
+                    Task {
+                        await appState.startBatchCompare(
+                            sourcePhoto: selectedSourcePhoto!,
+                            targetPhotos: selectedTargetPhotos
+                        )
+                    }
+                }) {
+                    HStack {
+                        Image(systemName: "magnifyingglass")
+                        Text("Find Photos of You")
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Color.primaryColor)
+                    .foregroundColor(.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 22))
+                    .shadow(color: Color.neumorphicShadow.opacity(0.18), radius: 4, x: 0, y: 2)
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Matching State Content
+struct MatchingStateContent: View {
+    let selectedSourcePhoto: Photo?
+    let selectedTargetPhotos: [Photo]
+    let appState: AppState
+    
+    var body: some View {
+        VStack(spacing: 24) {
+            // Show selected source photo
+            if let sourcePhoto = selectedSourcePhoto {
+                AsyncImage(url: URL(string: sourcePhoto.baseUrl)) { image in
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                } placeholder: {
+                    Rectangle()
+                        .fill(Color.gray.opacity(0.3))
+                }
+                .frame(width: 80, height: 80)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+            }
+            
+            // Show target photos being processed
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Processing Photos")
+                    .font(.headline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.textColorPrimary)
+                
+                TargetPhotosCarouselView(
+                    photos: .constant(selectedTargetPhotos),
+                    carouselIndex: .constant(0)
+                )
+            }
+            
+            // Progress bar
+            FaceMatchingProgressBar(
+                matchesAttempted: appState.matchesAttempted,
+                totalTargetImages: selectedTargetPhotos.count
+            )
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            
+            // Progress text
+            Text("Comparing photos... \(Int(appState.batchCompareProgress * 100))%")
+                .font(.caption)
+                .foregroundColor(.textColorSecondary)
+        }
+    }
+}
+
+// MARK: - Matched State Content
+struct MatchedStateContent: View {
+    let selectedSourcePhoto: Photo?
+    let selectedTargetPhotos: [Photo]
+    let appState: AppState
+    @Binding var isPresented: Bool
+    
+    var body: some View {
+        VStack(spacing: 24) {
+            // Results carousel
+            if !appState.batchCompareResults.isEmpty {
+                ResultsSection(results: appState.batchCompareResults)
+            }
+            
+            // Action buttons
+            VStack(spacing: 12) {
+                // Confirm matches button
+                let matchingResults = appState.batchCompareResults.filter { !$0.faceMatches.isEmpty }
+                if !matchingResults.isEmpty {
+                    Button(action: {
+                        Task {
+                            await appState.confirmMatches()
+                            isPresented = false
+                            appState.resetBatchCompare()
+                        }
+                    }) {
+                        HStack {
+                            Image(systemName: "checkmark.circle.fill")
+                            Text("Confirm \(matchingResults.count) Matches")
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color.primaryColor)
+                        .foregroundColor(.white)
+                        .clipShape(RoundedRectangle(cornerRadius: 22))
+                        .shadow(color: Color.neumorphicShadow.opacity(0.18), radius: 4, x: 0, y: 2)
+                    }
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Error State Content
+struct ErrorStateContent: View {
+    let selectedSourcePhoto: Photo?
+    let selectedTargetPhotos: [Photo]
+    let appState: AppState
+    @Binding var isPresented: Bool
+    
+    var body: some View {
+        VStack(spacing: 24) {
+            // Error message
+            VStack(spacing: 16) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.system(size: 48))
+                    .foregroundColor(.orange)
+                
+                Text("Face Matching Failed")
+                    .font(.headline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.textColorPrimary)
+                
+                if let error = appState.batchCompareError {
+                    Text(error)
+                        .font(.caption)
+                        .foregroundColor(.textColorSecondary)
+                        .multilineTextAlignment(.center)
+                }
+            }
+            .padding()
+            .background(Color.primaryColor.opacity(0.1))
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            
+            // Action buttons
+            VStack(spacing: 12) {
+                Button(action: {
+                    isPresented = false
+                    appState.resetBatchCompare()
+                }) {
+                    Text("Close")
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color.neumorphicShadow.opacity(0.3))
+                        .foregroundColor(Color.textColorPrimary)
+                        .clipShape(RoundedRectangle(cornerRadius: 22))
+                        .shadow(color: Color.neumorphicShadow.opacity(0.18), radius: 4, x: 0, y: 2)
+                }
+                
+                Button(action: {
+                    appState.resetBatchCompare()
+                }) {
+                    Text("Try Again")
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color.primaryColor.opacity(0.1))
+                        .foregroundColor(Color.primaryColorDark)
+                        .clipShape(RoundedRectangle(cornerRadius: 22))
+                        .shadow(color: Color.neumorphicShadow.opacity(0.18), radius: 4, x: 0, y: 2)
+                }
+            }
+        }
+    }
 } 
