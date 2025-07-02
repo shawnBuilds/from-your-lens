@@ -140,6 +140,75 @@ router.get('/google/callback', (req, res, next) => {
     }
 });
 
+// POST route for iOS token exchange
+router.post('/google/callback', async (req, res) => {
+    console.log('[GoogleOAuth] POST /auth/google/callback - iOS token exchange');
+    console.log('[GoogleOAuth] Request headers:', req.headers);
+    console.log('[GoogleOAuth] Request body:', req.body);
+    
+    try {
+        const { id_token, access_token } = req.body;
+        
+        if (!id_token || !access_token) {
+            console.error('[GoogleOAuth] Missing tokens in request body');
+            return res.status(400).json({ error: 'Missing id_token or access_token' });
+        }
+        
+        // Verify the ID token with Google
+        const { OAuth2Client } = require('google-auth-library');
+        const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+        
+        const ticket = await client.verifyIdToken({
+            idToken: id_token,
+            audience: process.env.GOOGLE_CLIENT_ID
+        });
+        
+        const payload = ticket.getPayload();
+        console.log('[GoogleOAuth] ID token verified for user:', payload.email);
+        
+        // Create or update user in database
+        const userData = {
+            googleId: payload.sub,
+            email: payload.email,
+            fullName: payload.name,
+            profilePictureUrl: payload.picture
+        };
+        
+        console.log('[GoogleOAuth] User data to upsert:', userData);
+        const user = await upsertUser(userData);
+        console.log('[GoogleOAuth] User upserted successfully:', user.email);
+        
+        // Generate JWT token
+        const token = jwt.sign(
+            { 
+                id: user.id, 
+                email: user.email,
+                googleId: user.google_id
+            },
+            process.env.JWT_SECRET || 'your-secret-key',
+            { expiresIn: '7d' }
+        );
+        
+        console.log('[GoogleOAuth] JWT token generated successfully');
+        
+        // Return JWT response for iOS
+        res.json({
+            token: token,
+            user: {
+                id: user.id,
+                email: user.email,
+                fullName: user.full_name,
+                profilePictureUrl: user.profile_picture_url
+            }
+        });
+        
+    } catch (error) {
+        console.error('[GoogleOAuth] Error in POST callback:', error);
+        console.error('[GoogleOAuth] Error stack:', error.stack);
+        res.status(500).json({ error: 'Token exchange failed' });
+    }
+});
+
 // OAuth failure route
 router.get('/failure', (req, res) => {
     console.log('[GoogleOAuth] OAuth authentication failed');

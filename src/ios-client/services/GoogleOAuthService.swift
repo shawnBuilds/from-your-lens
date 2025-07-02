@@ -22,6 +22,7 @@ class GoogleOAuthService: ObservableObject {
     // MARK: - Setup
     private func setupGoogleSignIn() {
         // Use the client ID from Info.plist (GIDClientID key)
+        print("[GoogleOAuth] Setting up Google Sign-In with client ID:", clientID)
         let config = GIDConfiguration(clientID: clientID)
         GIDSignIn.sharedInstance.configuration = config
         

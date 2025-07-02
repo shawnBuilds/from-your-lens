@@ -45,7 +45,7 @@
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>FromYourLens needs access to your photo library to display your photos for the photo matching feature.</string>
 	<key>GIDClientID</key>
-	<string>374611061345-ld8j0s0mb21d2rh4k6unhtkuic7cv06j.apps.googleusercontent.com</string>
+	<string>374611061345-5op1h3i3pp2a53jo7t71e705qvomg5m4.apps.googleusercontent.com</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
