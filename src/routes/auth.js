@@ -146,25 +146,61 @@ router.post('/google/callback', async (req, res) => {
     console.log('[GoogleOAuth] Request headers:', req.headers);
     console.log('[GoogleOAuth] Request body:', req.body);
     
+    // Log environment configuration
+    console.log('[GoogleOAuth] Environment check:');
+    console.log('[GoogleOAuth] - GOOGLE_CLIENT_ID:', process.env.GOOGLE_CLIENT_ID ? `${process.env.GOOGLE_CLIENT_ID.substring(0, 20)}...` : 'NOT SET');
+    console.log('[GoogleOAuth] - GOOGLE_CLIENT_SECRET:', process.env.GOOGLE_CLIENT_SECRET ? `${process.env.GOOGLE_CLIENT_SECRET.substring(0, 10)}...` : 'NOT SET');
+    console.log('[GoogleOAuth] - JWT_SECRET:', process.env.JWT_SECRET ? 'SET' : 'NOT SET');
+    
     try {
         const { id_token, access_token } = req.body;
         
         if (!id_token || !access_token) {
             console.error('[GoogleOAuth] Missing tokens in request body');
+            console.error('[GoogleOAuth] - id_token present:', !!id_token);
+            console.error('[GoogleOAuth] - access_token present:', !!access_token);
             return res.status(400).json({ error: 'Missing id_token or access_token' });
         }
+        
+        console.log('[GoogleOAuth] Tokens received:');
+        console.log('[GoogleOAuth] - id_token length:', id_token.length);
+        console.log('[GoogleOAuth] - access_token length:', access_token.length);
+        console.log('[GoogleOAuth] - id_token preview:', id_token.substring(0, 50) + '...');
         
         // Verify the ID token with Google
         const { OAuth2Client } = require('google-auth-library');
         const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+        
+        console.log('[GoogleOAuth] Creating OAuth2Client with client ID:', process.env.GOOGLE_CLIENT_ID);
+        console.log('[GoogleOAuth] Attempting to verify ID token...');
         
         const ticket = await client.verifyIdToken({
             idToken: id_token,
             audience: process.env.GOOGLE_CLIENT_ID
         });
         
+        console.log('[GoogleOAuth] ID token verification successful!');
         const payload = ticket.getPayload();
-        console.log('[GoogleOAuth] ID token verified for user:', payload.email);
+        
+        console.log('[GoogleOAuth] Token payload details:');
+        console.log('[GoogleOAuth] - iss (issuer):', payload.iss);
+        console.log('[GoogleOAuth] - aud (audience):', payload.aud);
+        console.log('[GoogleOAuth] - sub (subject):', payload.sub);
+        console.log('[GoogleOAuth] - email:', payload.email);
+        console.log('[GoogleOAuth] - email_verified:', payload.email_verified);
+        console.log('[GoogleOAuth] - name:', payload.name);
+        console.log('[GoogleOAuth] - picture:', payload.picture);
+        console.log('[GoogleOAuth] - iat (issued at):', new Date(payload.iat * 1000).toISOString());
+        console.log('[GoogleOAuth] - exp (expires at):', new Date(payload.exp * 1000).toISOString());
+        
+        // Verify expected values
+        const expectedIssuer = 'https://accounts.google.com';
+        const expectedAudience = process.env.GOOGLE_CLIENT_ID;
+        
+        console.log('[GoogleOAuth] Token validation checks:');
+        console.log('[GoogleOAuth] - Issuer matches expected:', payload.iss === expectedIssuer);
+        console.log('[GoogleOAuth] - Audience matches expected:', payload.aud === expectedAudience);
+        console.log('[GoogleOAuth] - Token not expired:', payload.exp > Date.now() / 1000);
         
         // Create or update user in database
         const userData = {
@@ -177,6 +213,7 @@ router.post('/google/callback', async (req, res) => {
         console.log('[GoogleOAuth] User data to upsert:', userData);
         const user = await upsertUser(userData);
         console.log('[GoogleOAuth] User upserted successfully:', user.email);
+        console.log('[GoogleOAuth] User ID from database:', user.id);
         
         // Generate JWT token
         const token = jwt.sign(
@@ -190,9 +227,11 @@ router.post('/google/callback', async (req, res) => {
         );
         
         console.log('[GoogleOAuth] JWT token generated successfully');
+        console.log('[GoogleOAuth] JWT token length:', token.length);
+        console.log('[GoogleOAuth] JWT token preview:', token.substring(0, 50) + '...');
         
         // Return JWT response for iOS
-        res.json({
+        const response = {
             token: token,
             user: {
                 id: user.id,
@@ -200,11 +239,38 @@ router.post('/google/callback', async (req, res) => {
                 fullName: user.full_name,
                 profilePictureUrl: user.profile_picture_url
             }
-        });
+        };
+        
+        console.log('[GoogleOAuth] Sending successful response to iOS');
+        console.log('[GoogleOAuth] Response user ID:', response.user.id);
+        console.log('[GoogleOAuth] Response user email:', response.user.email);
+        
+        res.json(response);
         
     } catch (error) {
         console.error('[GoogleOAuth] Error in POST callback:', error);
+        console.error('[GoogleOAuth] Error name:', error.name);
+        console.error('[GoogleOAuth] Error message:', error.message);
         console.error('[GoogleOAuth] Error stack:', error.stack);
+        
+        // Additional error context
+        if (error.message.includes('Wrong recipient')) {
+            console.error('[GoogleOAuth] AUDIENCE MISMATCH ERROR:');
+            console.error('[GoogleOAuth] - This usually means the client ID in Google Cloud Console');
+            console.error('[GoogleOAuth] - doesn\'t match the client ID used for verification');
+            console.error('[GoogleOAuth] - Current GOOGLE_CLIENT_ID:', process.env.GOOGLE_CLIENT_ID);
+        }
+        
+        if (error.message.includes('Token used too late')) {
+            console.error('[GoogleOAuth] TOKEN EXPIRATION ERROR:');
+            console.error('[GoogleOAuth] - The ID token has expired');
+        }
+        
+        if (error.message.includes('Invalid token')) {
+            console.error('[GoogleOAuth] INVALID TOKEN ERROR:');
+            console.error('[GoogleOAuth] - The ID token format is invalid or corrupted');
+        }
+        
         res.status(500).json({ error: 'Token exchange failed' });
     }
 });

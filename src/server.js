@@ -46,7 +46,14 @@ app.use(passport.initialize());
 // Log OAuth configuration (without exposing secrets)
 console.log('[Server] OAuth Configuration:');
 console.log('[Server] - Google Client ID configured:', !!process.env.GOOGLE_CLIENT_ID);
+if (process.env.GOOGLE_CLIENT_ID) {
+    console.log('[Server] - Google Client ID (first 20 chars):', process.env.GOOGLE_CLIENT_ID.substring(0, 20) + '...');
+    console.log('[Server] - Google Client ID (last 10 chars):', '...' + process.env.GOOGLE_CLIENT_ID.substring(process.env.GOOGLE_CLIENT_ID.length - 10));
+}
 console.log('[Server] - Google Client Secret configured:', !!process.env.GOOGLE_CLIENT_SECRET);
+if (process.env.GOOGLE_CLIENT_SECRET) {
+    console.log('[Server] - Google Client Secret (first 10 chars):', process.env.GOOGLE_CLIENT_SECRET.substring(0, 10) + '...');
+}
 console.log('[Server] - JWT Secret configured:', !!process.env.JWT_SECRET);
 console.log('[Server] - NODE_ENV:', process.env.NODE_ENV);
 console.log('[Server] - Callback URL:', process.env.NODE_ENV === 'production' 
