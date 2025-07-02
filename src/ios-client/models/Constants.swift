@@ -7,7 +7,7 @@ struct FeatureFlags {
     static let showTestingFormOnStart = false
     static let defaultBatchTargetCount = 2
     static let enableGoogleDriveUsage = false
-    static let enableSkipAuthFlow = true // Set to true to enable the "skip auth" modal for development
+    static let enableSkipAuthFlow = false // Set to true to enable the "skip auth" modal for development
     static let enableDebugLogSkipAuth = false // Debug: log state changes for skip auth/test data
     static let enableDebugLogPhotoGallery = false // Debug: log data shown in photo gallery
     static let enableDebugLogLandingView = false // Debug: log layout info for landing view

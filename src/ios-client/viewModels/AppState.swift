@@ -82,20 +82,20 @@ class AppState: ObservableObject {
             await fetchPhotosForUser(user)
         } else {
             // Fallback to legacy auth service
-            do {
-                let result = try await authService.handleReturningUser()
-                if result.sessionValid, let user = result.user {
-                    currentUser = user
-                    currentView = .photos
-                    
-                    // Fetch photos based on feature flags
-                    await fetchPhotosForUser(user)
-                } else {
-                    currentView = .landing
-                }
-            } catch {
-                print("[AppState] Error checking returning user:", error)
+        do {
+            let result = try await authService.handleReturningUser()
+            if result.sessionValid, let user = result.user {
+                currentUser = user
+                currentView = .photos
+                
+                // Fetch photos based on feature flags
+                await fetchPhotosForUser(user)
+            } else {
                 currentView = .landing
+            }
+        } catch {
+            print("[AppState] Error checking returning user:", error)
+            currentView = .landing
             }
         }
         

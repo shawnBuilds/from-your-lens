@@ -24,18 +24,6 @@
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
 		<false/>
-		<key>UISceneConfigurations</key>
-		<dict>
-			<key>UIWindowSceneSessionRoleApplication</key>
-			<array>
-				<dict>
-					<key>UISceneConfigurationName</key>
-					<string>Default Configuration</string>
-					<key>UISceneDelegateClassName</key>
-					<string>$(PRODUCT_MODULE_NAME).SceneDelegate</string>
-				</dict>
-			</array>
-		</dict>
 	</dict>
 	<key>UILaunchScreen</key>
 	<dict/>
@@ -56,5 +44,19 @@
 	<true/>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>FromYourLens needs access to your photo library to display your photos for the photo matching feature.</string>
+	<key>GIDClientID</key>
+	<string>374611061345-ld8j0s0mb21d2rh4k6unhtkuic7cv06j.apps.googleusercontent.com</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>GoogleOAuth</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>fromyourlens</string>
+				<string>com.googleusercontent.apps.374611061345-5op1h3i3pp2a53jo7t71e705qvomg5m4</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>

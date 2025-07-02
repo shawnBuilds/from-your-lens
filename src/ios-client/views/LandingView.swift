@@ -94,21 +94,21 @@ struct LandingView: View {
                         VStack(spacing: 16) {
                             if FeatureFlags.enableSkipAuthFlow {
                                 Button(action: {
-                                    showSkipAuthModal = true
-                                }) {
-                                    HStack(spacing: 12) {
+                                showSkipAuthModal = true
+                        }) {
+                            HStack(spacing: 12) {
                                         Image(systemName: "globe")
-                                            .resizable()
-                                            .frame(width: 22, height: 22)
-                                        Text("Sign in with Google")
-                                            .font(.headline)
-                                    }
-                                    .padding(.vertical, 16)
-                                    .padding(.horizontal, 40)
-                                    .background(Color.primaryColorDark)
-                                    .foregroundColor(.white)
-                                    .cornerRadius(30)
-                                    .shadow(color: .neumorphicShadow.opacity(0.5), radius: 8, x: 4, y: 4)
+                                    .resizable()
+                                    .frame(width: 22, height: 22)
+                                Text("Sign in with Google")
+                                    .font(.headline)
+                            }
+                            .padding(.vertical, 16)
+                            .padding(.horizontal, 40)
+                            .background(Color.primaryColorDark)
+                            .foregroundColor(.white)
+                            .cornerRadius(30)
+                            .shadow(color: .neumorphicShadow.opacity(0.5), radius: 8, x: 4, y: 4)
                                 }
                             } else {
                                 // Real Google Sign-In Button

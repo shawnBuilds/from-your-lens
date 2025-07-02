@@ -16,33 +16,31 @@ passport.use(new GoogleStrategy({
     scope: ['profile', 'email'] // Only basic profile and email, no Drive/Photos scopes
 }, async (accessToken, refreshToken, profile, done) => {
     try {
-        console.log('[GoogleOAuth] Processing Google profile:', {
-            id: profile.id,
-            email: profile.emails?.[0]?.value,
-            displayName: profile.displayName
-        });
+        console.log('[GoogleOAuth] Strategy - Processing Google profile');
+        console.log('[GoogleOAuth] Strategy - Profile ID:', profile.id);
+        console.log('[GoogleOAuth] Strategy - Profile email:', profile.emails?.[0]?.value);
+        console.log('[GoogleOAuth] Strategy - Profile display name:', profile.displayName);
+        console.log('[GoogleOAuth] Strategy - Access token received:', !!accessToken);
+        console.log('[GoogleOAuth] Strategy - Refresh token received:', !!refreshToken);
 
         // Create or update user in database
         const userData = {
             googleId: profile.id,
             email: profile.emails?.[0]?.value,
             fullName: profile.displayName,
-            profilePictureUrl: profile.photos?.[0]?.value,
-            // No Drive/Photos tokens since we're not requesting those scopes
-            driveAccessToken: null,
-            driveRefreshToken: null,
-            driveTokenExpiry: null,
-            photosAccessToken: null,
-            photosRefreshToken: null,
-            photosTokenExpiry: null
+            profilePictureUrl: profile.photos?.[0]?.value
         };
 
+        console.log('[GoogleOAuth] Strategy - User data to upsert:', userData);
+
         const user = await upsertUser(userData);
-        console.log('[GoogleOAuth] User upserted successfully:', user.email);
+        console.log('[GoogleOAuth] Strategy - User upserted successfully:', user.email);
+        console.log('[GoogleOAuth] Strategy - User ID from database:', user.id);
         
         return done(null, user);
     } catch (error) {
-        console.error('[GoogleOAuth] Error processing Google profile:', error);
+        console.error('[GoogleOAuth] Strategy - Error processing Google profile:', error);
+        console.error('[GoogleOAuth] Strategy - Error stack:', error.stack);
         return done(error, null);
     }
 }));
@@ -85,42 +83,62 @@ const verifyJWT = (req, res, next) => {
 };
 
 // Google OAuth Routes
-router.get('/google', passport.authenticate('google', { 
-    scope: ['profile', 'email'],
-    prompt: 'select_account'
-}));
+router.get('/google', (req, res, next) => {
+    console.log('[GoogleOAuth] GET /auth/google - Starting OAuth flow');
+    console.log('[GoogleOAuth] Request headers:', req.headers);
+    console.log('[GoogleOAuth] Request query:', req.query);
+    
+    passport.authenticate('google', { 
+        scope: ['profile', 'email'],
+        prompt: 'select_account'
+    })(req, res, next);
+});
 
-router.get('/google/callback', 
+router.get('/google/callback', (req, res, next) => {
+    console.log('[GoogleOAuth] GET /auth/google/callback - OAuth callback received');
+    console.log('[GoogleOAuth] Callback request headers:', req.headers);
+    console.log('[GoogleOAuth] Callback request query:', req.query);
+    console.log('[GoogleOAuth] Callback request body:', req.body);
+    console.log('[GoogleOAuth] Callback request method:', req.method);
+    
     passport.authenticate('google', { 
         failureRedirect: '/auth/failure',
         session: false 
-    }), 
-    async (req, res) => {
-        try {
-            console.log('[GoogleOAuth] OAuth callback successful for user:', req.user.email);
-            
-            // Generate JWT token
-            const token = jwt.sign(
-                { 
-                    id: req.user.id, 
-                    email: req.user.email,
-                    googleId: req.user.google_id
-                },
-                process.env.JWT_SECRET || 'your-secret-key',
-                { expiresIn: '7d' }
-            );
+    })(req, res, next);
+}, async (req, res) => {
+    try {
+        console.log('[GoogleOAuth] OAuth callback successful for user:', req.user.email);
+        console.log('[GoogleOAuth] User data from passport:', {
+            id: req.user.id,
+            email: req.user.email,
+            googleId: req.user.google_id,
+            fullName: req.user.full_name
+        });
+        
+        // Generate JWT token
+        const token = jwt.sign(
+            { 
+                id: req.user.id, 
+                email: req.user.email,
+                googleId: req.user.google_id
+            },
+            process.env.JWT_SECRET || 'your-secret-key',
+            { expiresIn: '7d' }
+        );
 
-            // For iOS client, redirect to a custom URL scheme
-            const redirectUrl = `fromyourlens://oauth-callback?token=${encodeURIComponent(token)}&userId=${req.user.id}&email=${encodeURIComponent(req.user.email)}&fullName=${encodeURIComponent(req.user.full_name || '')}&profilePictureUrl=${encodeURIComponent(req.user.profile_picture_url || '')}`;
-            
-            console.log('[GoogleOAuth] Redirecting to iOS app:', redirectUrl);
-            res.redirect(redirectUrl);
-        } catch (error) {
-            console.error('[GoogleOAuth] Error in callback:', error);
-            res.redirect('/auth/failure');
-        }
+        console.log('[GoogleOAuth] JWT token generated successfully');
+
+        // For iOS client, redirect to a custom URL scheme
+        const redirectUrl = `fromyourlens://oauth-callback?token=${encodeURIComponent(token)}&userId=${req.user.id}&email=${encodeURIComponent(req.user.email)}&fullName=${encodeURIComponent(req.user.full_name || '')}&profilePictureUrl=${encodeURIComponent(req.user.profile_picture_url || '')}`;
+        
+        console.log('[GoogleOAuth] Redirecting to iOS app:', redirectUrl);
+        res.redirect(redirectUrl);
+    } catch (error) {
+        console.error('[GoogleOAuth] Error in callback:', error);
+        console.error('[GoogleOAuth] Error stack:', error.stack);
+        res.redirect('/auth/failure');
     }
-);
+});
 
 // OAuth failure route
 router.get('/failure', (req, res) => {

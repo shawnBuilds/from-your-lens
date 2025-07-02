@@ -21,14 +21,8 @@ class GoogleOAuthService: ObservableObject {
     
     // MARK: - Setup
     private func setupGoogleSignIn() {
-        guard let path = Bundle.main.path(forResource: "GoogleService-Info", ofType: "plist"),
-              let plist = NSDictionary(contentsOfFile: path),
-              let clientId = plist["CLIENT_ID"] as? String else {
-            print("[GoogleOAuth] Failed to load GoogleService-Info.plist")
-            return
-        }
-        
-        let config = GIDConfiguration(clientID: clientId)
+        // Use the client ID from Info.plist (GIDClientID key)
+        let config = GIDConfiguration(clientID: clientID)
         GIDSignIn.sharedInstance.configuration = config
         
         // Check for existing sign-in

@@ -16,4 +16,9 @@ A daily log of completed tasks and milestones.
 
 ## 6/30
 - Implemented face matching for iCloud photos
-- Improved visual layout of the face matching view on the iOS app 
+- Improved visual layout of the face matching view on the iOS app
+
+## 07/01
+- Created Google OAuth client for iOS
+- Adjusted backend authentication to support iOS
+- Integrated Google Sign-In flow with iOS app
