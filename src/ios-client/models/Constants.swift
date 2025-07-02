@@ -27,6 +27,9 @@ struct FeatureFlags {
     static let faceDetectionSimilarityThreshold = 90.0 // Minimum similarity threshold for face matching
     static let maxImageSizeForFaceDetection = 5 * 1024 * 1024 // 5MB max image size for face detection
     static let minImageSizeForFaceDetection = 1 * 1024 // 1KB min image size for face detection
+    
+    // MARK: - OAuth Integration
+    static let enableDebugLogOAuth = false // Debug: log OAuth operations and network requests
 }        
 
 // MARK: - API Configuration

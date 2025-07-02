@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const { getUserById, upsertUser } = require('../../db/users');
+const Controls = require('../controls');
 
 const router = express.Router();
 
@@ -16,12 +17,14 @@ passport.use(new GoogleStrategy({
     scope: ['profile', 'email'] // Only basic profile and email, no Drive/Photos scopes
 }, async (accessToken, refreshToken, profile, done) => {
     try {
-        console.log('[GoogleOAuth] Strategy - Processing Google profile');
-        console.log('[GoogleOAuth] Strategy - Profile ID:', profile.id);
-        console.log('[GoogleOAuth] Strategy - Profile email:', profile.emails?.[0]?.value);
-        console.log('[GoogleOAuth] Strategy - Profile display name:', profile.displayName);
-        console.log('[GoogleOAuth] Strategy - Access token received:', !!accessToken);
-        console.log('[GoogleOAuth] Strategy - Refresh token received:', !!refreshToken);
+        if (Controls.enableDebugLogOAuth) {
+            console.log('[GoogleOAuth] Strategy - Processing Google profile');
+            console.log('[GoogleOAuth] Strategy - Profile ID:', profile.id);
+            console.log('[GoogleOAuth] Strategy - Profile email:', profile.emails?.[0]?.value);
+            console.log('[GoogleOAuth] Strategy - Profile display name:', profile.displayName);
+            console.log('[GoogleOAuth] Strategy - Access token received:', !!accessToken);
+            console.log('[GoogleOAuth] Strategy - Refresh token received:', !!refreshToken);
+        }
 
         // Create or update user in database
         const userData = {
@@ -31,11 +34,15 @@ passport.use(new GoogleStrategy({
             profilePictureUrl: profile.photos?.[0]?.value
         };
 
-        console.log('[GoogleOAuth] Strategy - User data to upsert:', userData);
+        if (Controls.enableDebugLogOAuth) {
+            console.log('[GoogleOAuth] Strategy - User data to upsert:', userData);
+        }
 
         const user = await upsertUser(userData);
-        console.log('[GoogleOAuth] Strategy - User upserted successfully:', user.email);
-        console.log('[GoogleOAuth] Strategy - User ID from database:', user.id);
+        if (Controls.enableDebugLogOAuth) {
+            console.log('[GoogleOAuth] Strategy - User upserted successfully:', user.email);
+            console.log('[GoogleOAuth] Strategy - User ID from database:', user.id);
+        }
         
         return done(null, user);
     } catch (error) {
@@ -84,9 +91,11 @@ const verifyJWT = (req, res, next) => {
 
 // Google OAuth Routes
 router.get('/google', (req, res, next) => {
-    console.log('[GoogleOAuth] GET /auth/google - Starting OAuth flow');
-    console.log('[GoogleOAuth] Request headers:', req.headers);
-    console.log('[GoogleOAuth] Request query:', req.query);
+    if (Controls.enableDebugLogOAuth) {
+        console.log('[GoogleOAuth] GET /auth/google - Starting OAuth flow');
+        console.log('[GoogleOAuth] Request headers:', req.headers);
+        console.log('[GoogleOAuth] Request query:', req.query);
+    }
     
     passport.authenticate('google', { 
         scope: ['profile', 'email'],
@@ -95,11 +104,13 @@ router.get('/google', (req, res, next) => {
 });
 
 router.get('/google/callback', (req, res, next) => {
-    console.log('[GoogleOAuth] GET /auth/google/callback - OAuth callback received');
-    console.log('[GoogleOAuth] Callback request headers:', req.headers);
-    console.log('[GoogleOAuth] Callback request query:', req.query);
-    console.log('[GoogleOAuth] Callback request body:', req.body);
-    console.log('[GoogleOAuth] Callback request method:', req.method);
+    if (Controls.enableDebugLogOAuth) {
+        console.log('[GoogleOAuth] GET /auth/google/callback - OAuth callback received');
+        console.log('[GoogleOAuth] Callback request headers:', req.headers);
+        console.log('[GoogleOAuth] Callback request query:', req.query);
+        console.log('[GoogleOAuth] Callback request body:', req.body);
+        console.log('[GoogleOAuth] Callback request method:', req.method);
+    }
     
     passport.authenticate('google', { 
         failureRedirect: '/auth/failure',
@@ -107,13 +118,15 @@ router.get('/google/callback', (req, res, next) => {
     })(req, res, next);
 }, async (req, res) => {
     try {
-        console.log('[GoogleOAuth] OAuth callback successful for user:', req.user.email);
-        console.log('[GoogleOAuth] User data from passport:', {
-            id: req.user.id,
-            email: req.user.email,
-            googleId: req.user.google_id,
-            fullName: req.user.full_name
-        });
+        if (Controls.enableDebugLogOAuth) {
+            console.log('[GoogleOAuth] OAuth callback successful for user:', req.user.email);
+            console.log('[GoogleOAuth] User data from passport:', {
+                id: req.user.id,
+                email: req.user.email,
+                googleId: req.user.google_id,
+                fullName: req.user.full_name
+            });
+        }
         
         // Generate JWT token
         const token = jwt.sign(
@@ -126,12 +139,16 @@ router.get('/google/callback', (req, res, next) => {
             { expiresIn: '7d' }
         );
 
-        console.log('[GoogleOAuth] JWT token generated successfully');
+        if (Controls.enableDebugLogOAuth) {
+            console.log('[GoogleOAuth] JWT token generated successfully');
+        }
 
         // For iOS client, redirect to a custom URL scheme
         const redirectUrl = `fromyourlens://oauth-callback?token=${encodeURIComponent(token)}&userId=${req.user.id}&email=${encodeURIComponent(req.user.email)}&fullName=${encodeURIComponent(req.user.full_name || '')}&profilePictureUrl=${encodeURIComponent(req.user.profile_picture_url || '')}`;
         
-        console.log('[GoogleOAuth] Redirecting to iOS app:', redirectUrl);
+        if (Controls.enableDebugLogOAuth) {
+            console.log('[GoogleOAuth] Redirecting to iOS app:', redirectUrl);
+        }
         res.redirect(redirectUrl);
     } catch (error) {
         console.error('[GoogleOAuth] Error in callback:', error);
@@ -142,15 +159,17 @@ router.get('/google/callback', (req, res, next) => {
 
 // POST route for iOS token exchange
 router.post('/google/callback', async (req, res) => {
-    console.log('[GoogleOAuth] POST /auth/google/callback - iOS token exchange');
-    console.log('[GoogleOAuth] Request headers:', req.headers);
-    console.log('[GoogleOAuth] Request body:', req.body);
-    
-    // Log environment configuration
-    console.log('[GoogleOAuth] Environment check:');
-    console.log('[GoogleOAuth] - GOOGLE_CLIENT_ID:', process.env.GOOGLE_CLIENT_ID ? `${process.env.GOOGLE_CLIENT_ID.substring(0, 20)}...` : 'NOT SET');
-    console.log('[GoogleOAuth] - GOOGLE_CLIENT_SECRET:', process.env.GOOGLE_CLIENT_SECRET ? `${process.env.GOOGLE_CLIENT_SECRET.substring(0, 10)}...` : 'NOT SET');
-    console.log('[GoogleOAuth] - JWT_SECRET:', process.env.JWT_SECRET ? 'SET' : 'NOT SET');
+    if (Controls.enableDebugLogOAuth) {
+        console.log('[GoogleOAuth] POST /auth/google/callback - iOS token exchange');
+        console.log('[GoogleOAuth] Request headers:', req.headers);
+        console.log('[GoogleOAuth] Request body:', req.body);
+        
+        // Log environment configuration
+        console.log('[GoogleOAuth] Environment check:');
+        console.log('[GoogleOAuth] - GOOGLE_CLIENT_ID:', process.env.GOOGLE_CLIENT_ID ? `${process.env.GOOGLE_CLIENT_ID.substring(0, 20)}...` : 'NOT SET');
+        console.log('[GoogleOAuth] - GOOGLE_CLIENT_SECRET:', process.env.GOOGLE_CLIENT_SECRET ? `${process.env.GOOGLE_CLIENT_SECRET.substring(0, 10)}...` : 'NOT SET');
+        console.log('[GoogleOAuth] - JWT_SECRET:', process.env.JWT_SECRET ? 'SET' : 'NOT SET');
+    }
     
     try {
         const { id_token, access_token } = req.body;
@@ -162,45 +181,53 @@ router.post('/google/callback', async (req, res) => {
             return res.status(400).json({ error: 'Missing id_token or access_token' });
         }
         
-        console.log('[GoogleOAuth] Tokens received:');
-        console.log('[GoogleOAuth] - id_token length:', id_token.length);
-        console.log('[GoogleOAuth] - access_token length:', access_token.length);
-        console.log('[GoogleOAuth] - id_token preview:', id_token.substring(0, 50) + '...');
+        if (Controls.enableDebugLogOAuth) {
+            console.log('[GoogleOAuth] Tokens received:');
+            console.log('[GoogleOAuth] - id_token length:', id_token.length);
+            console.log('[GoogleOAuth] - access_token length:', access_token.length);
+            console.log('[GoogleOAuth] - id_token preview:', id_token.substring(0, 50) + '...');
+        }
         
         // Verify the ID token with Google
         const { OAuth2Client } = require('google-auth-library');
         const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
         
-        console.log('[GoogleOAuth] Creating OAuth2Client with client ID:', process.env.GOOGLE_CLIENT_ID);
-        console.log('[GoogleOAuth] Attempting to verify ID token...');
+        if (Controls.enableDebugLogOAuth) {
+            console.log('[GoogleOAuth] Creating OAuth2Client with client ID:', process.env.GOOGLE_CLIENT_ID);
+            console.log('[GoogleOAuth] Attempting to verify ID token...');
+        }
         
         const ticket = await client.verifyIdToken({
             idToken: id_token,
             audience: process.env.GOOGLE_CLIENT_ID
         });
         
-        console.log('[GoogleOAuth] ID token verification successful!');
+        if (Controls.enableDebugLogOAuth) {
+            console.log('[GoogleOAuth] ID token verification successful!');
+            const payload = ticket.getPayload();
+            
+            console.log('[GoogleOAuth] Token payload details:');
+            console.log('[GoogleOAuth] - iss (issuer):', payload.iss);
+            console.log('[GoogleOAuth] - aud (audience):', payload.aud);
+            console.log('[GoogleOAuth] - sub (subject):', payload.sub);
+            console.log('[GoogleOAuth] - email:', payload.email);
+            console.log('[GoogleOAuth] - email_verified:', payload.email_verified);
+            console.log('[GoogleOAuth] - name:', payload.name);
+            console.log('[GoogleOAuth] - picture:', payload.picture);
+            console.log('[GoogleOAuth] - iat (issued at):', new Date(payload.iat * 1000).toISOString());
+            console.log('[GoogleOAuth] - exp (expires at):', new Date(payload.exp * 1000).toISOString());
+            
+            // Verify expected values
+            const expectedIssuer = 'https://accounts.google.com';
+            const expectedAudience = process.env.GOOGLE_CLIENT_ID;
+            
+            console.log('[GoogleOAuth] Token validation checks:');
+            console.log('[GoogleOAuth] - Issuer matches expected:', payload.iss === expectedIssuer);
+            console.log('[GoogleOAuth] - Audience matches expected:', payload.aud === expectedAudience);
+            console.log('[GoogleOAuth] - Token not expired:', payload.exp > Date.now() / 1000);
+        }
+        
         const payload = ticket.getPayload();
-        
-        console.log('[GoogleOAuth] Token payload details:');
-        console.log('[GoogleOAuth] - iss (issuer):', payload.iss);
-        console.log('[GoogleOAuth] - aud (audience):', payload.aud);
-        console.log('[GoogleOAuth] - sub (subject):', payload.sub);
-        console.log('[GoogleOAuth] - email:', payload.email);
-        console.log('[GoogleOAuth] - email_verified:', payload.email_verified);
-        console.log('[GoogleOAuth] - name:', payload.name);
-        console.log('[GoogleOAuth] - picture:', payload.picture);
-        console.log('[GoogleOAuth] - iat (issued at):', new Date(payload.iat * 1000).toISOString());
-        console.log('[GoogleOAuth] - exp (expires at):', new Date(payload.exp * 1000).toISOString());
-        
-        // Verify expected values
-        const expectedIssuer = 'https://accounts.google.com';
-        const expectedAudience = process.env.GOOGLE_CLIENT_ID;
-        
-        console.log('[GoogleOAuth] Token validation checks:');
-        console.log('[GoogleOAuth] - Issuer matches expected:', payload.iss === expectedIssuer);
-        console.log('[GoogleOAuth] - Audience matches expected:', payload.aud === expectedAudience);
-        console.log('[GoogleOAuth] - Token not expired:', payload.exp > Date.now() / 1000);
         
         // Create or update user in database
         const userData = {
@@ -210,10 +237,14 @@ router.post('/google/callback', async (req, res) => {
             profilePictureUrl: payload.picture
         };
         
-        console.log('[GoogleOAuth] User data to upsert:', userData);
+        if (Controls.enableDebugLogOAuth) {
+            console.log('[GoogleOAuth] User data to upsert:', userData);
+        }
         const user = await upsertUser(userData);
-        console.log('[GoogleOAuth] User upserted successfully:', user.email);
-        console.log('[GoogleOAuth] User ID from database:', user.id);
+        if (Controls.enableDebugLogOAuth) {
+            console.log('[GoogleOAuth] User upserted successfully:', user.email);
+            console.log('[GoogleOAuth] User ID from database:', user.id);
+        }
         
         // Generate JWT token
         const token = jwt.sign(
@@ -226,24 +257,29 @@ router.post('/google/callback', async (req, res) => {
             { expiresIn: '7d' }
         );
         
-        console.log('[GoogleOAuth] JWT token generated successfully');
-        console.log('[GoogleOAuth] JWT token length:', token.length);
-        console.log('[GoogleOAuth] JWT token preview:', token.substring(0, 50) + '...');
+        if (Controls.enableDebugLogOAuth) {
+            console.log('[GoogleOAuth] JWT token generated successfully');
+            console.log('[GoogleOAuth] JWT token length:', token.length);
+            console.log('[GoogleOAuth] JWT token preview:', token.substring(0, 50) + '...');
+        }
         
         // Return JWT response for iOS
         const response = {
             token: token,
             user: {
                 id: user.id,
+                google_id: user.google_id,
                 email: user.email,
                 fullName: user.full_name,
                 profilePictureUrl: user.profile_picture_url
             }
         };
         
-        console.log('[GoogleOAuth] Sending successful response to iOS');
-        console.log('[GoogleOAuth] Response user ID:', response.user.id);
-        console.log('[GoogleOAuth] Response user email:', response.user.email);
+        if (Controls.enableDebugLogOAuth) {
+            console.log('[GoogleOAuth] Sending successful response to iOS');
+            console.log('[GoogleOAuth] Response user ID:', response.user.id);
+            console.log('[GoogleOAuth] Response user email:', response.user.email);
+        }
         
         res.json(response);
         
@@ -277,7 +313,9 @@ router.post('/google/callback', async (req, res) => {
 
 // OAuth failure route
 router.get('/failure', (req, res) => {
-    console.log('[GoogleOAuth] OAuth authentication failed');
+    if (Controls.enableDebugLogOAuth) {
+        console.log('[GoogleOAuth] OAuth authentication failed');
+    }
     res.json({ 
         error: 'Authentication failed',
         message: 'Google OAuth authentication was unsuccessful'
@@ -289,17 +327,20 @@ router.get('/verify-token', verifyJWT, async (req, res) => {
     try {
         // Get fresh user data from database
         const user = await getUserById(req.user.id);
-        console.log('[Auth] Verifying token for user:', {
-            userId: user.id,
-            email: user.email,
-            hasProfilePicture: !!user.profile_picture_url,
-            profilePictureUrl: user.profile_picture_url
-        });
+        if (Controls.enableDebugLogAuth) {
+            console.log('[Auth] Verifying token for user:', {
+                userId: user.id,
+                email: user.email,
+                hasProfilePicture: !!user.profile_picture_url,
+                profilePictureUrl: user.profile_picture_url
+            });
+        }
 
         res.json({ 
             valid: true, 
             user: {
                 id: user.id,
+                google_id: user.google_id,
                 email: user.email,
                 fullName: user.full_name,
                 profilePictureUrl: user.profile_picture_url
@@ -316,7 +357,9 @@ router.get('/verify-token', verifyJWT, async (req, res) => {
 
 // Logout route
 router.get('/logout', verifyJWT, (req, res) => {
-    console.log('[Auth] User logout:', req.user.email);
+    if (Controls.enableDebugLogAuth) {
+        console.log('[Auth] User logout:', req.user.email);
+    }
     res.json({ success: true, message: 'Logged out successfully' });
 });
 

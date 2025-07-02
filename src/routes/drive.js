@@ -1,6 +1,7 @@
 const express = require('express');
 const { verifyJWT } = require('./auth');
 const driveService = require('../services/drive');
+const Controls = require('../controls');
 
 const router = express.Router();
 
@@ -15,20 +16,24 @@ router.use(isAuthenticated);
  * @desc Check Drive authentication status for the current user
  */
 router.get('/auth/status', async (req, res) => {
-    console.log('[Drive Routes] Checking auth status', {
-        userId: req.user.id,
-        email: req.user.email,
-        path: req.path,
-        timestamp: new Date().toISOString()
-    });
+    if (Controls.enableDebugLogDrive) {
+        console.log('[Drive Routes] Checking auth status', {
+            userId: req.user.id,
+            email: req.user.email,
+            path: req.path,
+            timestamp: new Date().toISOString()
+        });
+    }
     
     try {
         const initialized = await driveService.initializeForUser(req.user.id);
-        console.log('[Drive Routes] Drive auth status check complete', {
-            userId: req.user.id,
-            authenticated: initialized,
-            timestamp: new Date().toISOString()
-        });
+        if (Controls.enableDebugLogDrive) {
+            console.log('[Drive Routes] Drive auth status check complete', {
+                userId: req.user.id,
+                authenticated: initialized,
+                timestamp: new Date().toISOString()
+            });
+        }
         
         res.json({ 
             authenticated: initialized,
@@ -50,7 +55,9 @@ router.get('/auth/status', async (req, res) => {
  * @desc List files from user's Drive
  */
 router.get('/files', async (req, res) => {
-    console.log('[Drive Routes] Listing files for user:', req.user.id);
+    if (Controls.enableDebugLogDrive) {
+        console.log('[Drive Routes] Listing files for user:', req.user.id);
+    }
     try {
         const { pageSize = 10, pageToken = null, query = "mimeType contains 'image/'" } = req.query;
         
@@ -75,21 +82,25 @@ router.get('/files', async (req, res) => {
  * @desc Get metadata for a specific file
  */
 router.get('/files/:fileId', async (req, res) => {
-    console.log('[Drive Routes] Getting file metadata:', {
-        userId: req.user.id,
-        fileId: req.params.fileId
-    });
+    if (Controls.enableDebugLogDrive) {
+        console.log('[Drive Routes] Getting file metadata:', {
+            userId: req.user.id,
+            fileId: req.params.fileId
+        });
+    }
     try {
         const file = await driveService.getFile(req.params.fileId);
         
         // Log the availability of thumbnail and web view links
-        console.log('[Drive Routes] File metadata links:', {
-            fileId: req.params.fileId,
-            hasThumbnailLink: !!file.thumbnailLink,
-            hasWebViewLink: !!file.webViewLink,
-            thumbnailLink: file.thumbnailLink,
-            webViewLink: file.webViewLink
-        });
+        if (Controls.enableDebugLogDrive) {
+            console.log('[Drive Routes] File metadata links:', {
+                fileId: req.params.fileId,
+                hasThumbnailLink: !!file.thumbnailLink,
+                hasWebViewLink: !!file.webViewLink,
+                thumbnailLink: file.thumbnailLink,
+                webViewLink: file.webViewLink
+            });
+        }
         
         res.json(file);
     } catch (error) {
@@ -107,10 +118,12 @@ router.get('/files/:fileId', async (req, res) => {
  * @desc Get file content
  */
 router.get('/files/:fileId/content', async (req, res) => {
-    console.log('[Drive Routes] Getting file content:', {
-        userId: req.user.id,
-        fileId: req.params.fileId
-    });
+    if (Controls.enableDebugLogDrive) {
+        console.log('[Drive Routes] Getting file content:', {
+            userId: req.user.id,
+            fileId: req.params.fileId
+        });
+    }
     try {
         const fileStream = await driveService.getFileContent(req.params.fileId);
         
@@ -135,10 +148,12 @@ router.get('/files/:fileId/content', async (req, res) => {
  * @desc Search for files with specific criteria
  */
 router.get('/search', async (req, res) => {
-    console.log('[Drive Routes] Searching files:', {
-        userId: req.user.id,
-        query: req.query
-    });
+    if (Controls.enableDebugLogDrive) {
+        console.log('[Drive Routes] Searching files:', {
+            userId: req.user.id,
+            query: req.query
+        });
+    }
     try {
         const { query = '', mimeType = null, folderId = null } = req.query;
         
@@ -164,10 +179,12 @@ router.get('/search', async (req, res) => {
  * @desc Get contents of a specific folder
  */
 router.get('/folders/:folderId', async (req, res) => {
-    console.log('[Drive Routes] Getting folder contents:', {
-        userId: req.user.id,
-        folderId: req.params.folderId
-    });
+    if (Controls.enableDebugLogDrive) {
+        console.log('[Drive Routes] Getting folder contents:', {
+            userId: req.user.id,
+            folderId: req.params.folderId
+        });
+    }
     try {
         const files = await driveService.getFolderContents(req.params.folderId);
         res.json({ files });

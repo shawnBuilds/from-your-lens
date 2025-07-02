@@ -7,6 +7,7 @@ const {
   SearchFacesByImageCommand,
 } = require("@aws-sdk/client-rekognition");
 const { rekClient } = require("../lib/rekognitionClient");
+const Controls = require("../controls");
 
 const upload = multer();     // in-memory storage
 const router = express.Router();
@@ -17,14 +18,18 @@ const MIN_IMAGE_SIZE = 1 * 1024; // 1KB
 
 // Helper function to detect faces in an image
 async function detectFacesInImage(imageBuffer, imageName) {
-  console.log(`\nDetecting faces in ${imageName}...`);
+  if (Controls.enableDebugLogFaceDetection) {
+    console.log(`\nDetecting faces in ${imageName}...`);
+  }
   try {
     const detectCmd = new DetectFacesCommand({
       Image: { Bytes: imageBuffer },
       Attributes: ["ALL"],
     });
     const { FaceDetails } = await rekClient.send(detectCmd);
-    console.log(`Found ${FaceDetails?.length || 0} faces in ${imageName}`);
+    if (Controls.enableDebugLogFaceDetection) {
+      console.log(`Found ${FaceDetails?.length || 0} faces in ${imageName}`);
+    }
     return FaceDetails;
   } catch (err) {
     console.error(`Error detecting faces in ${imageName}:`, err.message);
@@ -54,8 +59,10 @@ router.post(
     { name: "target", maxCount: 1 },
   ]),
   async (req, res) => {
-    console.log("\n=== Face Comparison Request Started ===");
-    console.log("Request received at:", new Date().toISOString());
+    if (Controls.enableDebugLogFaceDetection) {
+      console.log("\n=== Face Comparison Request Started ===");
+      console.log("Request received at:", new Date().toISOString());
+    }
     
     try {
       // Log file details
@@ -67,17 +74,19 @@ router.post(
       const sourceFile = req.files.source?.[0];
       const targetFile = req.files.target?.[0];
 
-      console.log("\nSource Image Details:");
-      console.log("- Filename:", sourceFile?.originalname);
-      console.log("- Size:", sourceFile?.size, "bytes");
-      console.log("- MIME Type:", sourceFile?.mimetype);
-      console.log("- Buffer Length:", sourceFile?.buffer?.length);
+      if (Controls.enableDebugLogFaceDetection) {
+        console.log("\nSource Image Details:");
+        console.log("- Filename:", sourceFile?.originalname);
+        console.log("- Size:", sourceFile?.size, "bytes");
+        console.log("- MIME Type:", sourceFile?.mimetype);
+        console.log("- Buffer Length:", sourceFile?.buffer?.length);
 
-      console.log("\nTarget Image Details:");
-      console.log("- Filename:", targetFile?.originalname);
-      console.log("- Size:", targetFile?.size, "bytes");
-      console.log("- MIME Type:", targetFile?.mimetype);
-      console.log("- Buffer Length:", targetFile?.buffer?.length);
+        console.log("\nTarget Image Details:");
+        console.log("- Filename:", targetFile?.originalname);
+        console.log("- Size:", targetFile?.size, "bytes");
+        console.log("- MIME Type:", targetFile?.mimetype);
+        console.log("- Buffer Length:", targetFile?.buffer?.length);
+      }
 
       // Validate files
       if (!sourceFile?.buffer || !targetFile?.buffer) {
@@ -153,21 +162,27 @@ router.post(
         });
       }
 
-      console.log("\nPreparing CompareFacesCommand...");
+      if (Controls.enableDebugLogFaceDetection) {
+        console.log("\nPreparing CompareFacesCommand...");
+      }
       const cmd = new CompareFacesCommand({
         SourceImage: { Bytes: sourceFile.buffer },
         TargetImage: { Bytes: targetFile.buffer },
         SimilarityThreshold: 90,
       });
 
-      console.log("Sending request to AWS Rekognition...");
+      if (Controls.enableDebugLogFaceDetection) {
+        console.log("Sending request to AWS Rekognition...");
+      }
       const { FaceMatches, UnmatchedFaces } = await rekClient.send(cmd);
       
-      console.log("\nAWS Response:");
-      console.log("- Face Matches:", FaceMatches?.length || 0);
-      console.log("- Unmatched Faces:", UnmatchedFaces?.length || 0);
-      
-      console.log("\n=== Face Comparison Request Completed Successfully ===\n");
+      if (Controls.enableDebugLogFaceDetection) {
+        console.log("\nAWS Response:");
+        console.log("- Face Matches:", FaceMatches?.length || 0);
+        console.log("- Unmatched Faces:", UnmatchedFaces?.length || 0);
+        
+        console.log("\n=== Face Comparison Request Completed Successfully ===\n");
+      }
       res.json({ 
         FaceMatches, 
         UnmatchedFaces,

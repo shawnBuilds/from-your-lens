@@ -1,5 +1,6 @@
 const { google } = require('googleapis');
 const { getDriveTokens, updateDriveTokens, areDriveTokensValid } = require('../../db/users');
+const Controls = require('../controls');
 
 class DriveService {
     constructor() {

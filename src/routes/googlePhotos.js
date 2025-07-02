@@ -2,6 +2,7 @@ const express = require('express');
 const { verifyJWT } = require('./auth');
 const photosService = require('../services/photos');
 const photosDb = require('../../db/photos');
+const Controls = require('../controls');
 
 const router = express.Router();
 
@@ -147,20 +148,24 @@ router.get('/search', async (req, res) => {
  * @desc Check Photos authentication status for the current user
  */
 router.get('/auth/status', async (req, res) => {
-    console.log('[Photos Routes] Checking auth status', {
-        userId: req.user.id,
-        email: req.user.email,
-        path: req.path,
-        timestamp: new Date().toISOString()
-    });
+    if (Controls.enableDebugLogPhotos) {
+        console.log('[Photos Routes] Checking auth status', {
+            userId: req.user.id,
+            email: req.user.email,
+            path: req.path,
+            timestamp: new Date().toISOString()
+        });
+    }
     
     try {
         const initialized = await photosService.initializeForUser(req.user.id);
-        console.log('[Photos Routes] Photos auth status check complete', {
-            userId: req.user.id,
-            authenticated: initialized,
-            timestamp: new Date().toISOString()
-        });
+        if (Controls.enableDebugLogPhotos) {
+            console.log('[Photos Routes] Photos auth status check complete', {
+                userId: req.user.id,
+                authenticated: initialized,
+                timestamp: new Date().toISOString()
+            });
+        }
         
         res.json({ 
             authenticated: initialized,

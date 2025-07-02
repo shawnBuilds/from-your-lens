@@ -1,5 +1,6 @@
 const { google } = require('googleapis');
 const { getPhotosTokens, updatePhotosTokens, arePhotosTokensValid } = require('../../db/users');
+const Controls = require('../controls');
 
 class PhotosService {
     constructor() {
@@ -27,7 +28,9 @@ class PhotosService {
             // Test the connection
             await this.photos.albums.list({ pageSize: 1 });
             
-            console.log('[Photos Service] Successfully initialized Photos client');
+            if (Controls.enableDebugLogPhotos) {
+                console.log('[Photos Service] Successfully initialized Photos client');
+            }
             return true;
         } catch (error) {
             console.error('[Photos Service] Error initializing Photos client:', error.message);
