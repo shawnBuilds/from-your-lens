@@ -54,8 +54,21 @@ struct PhotoGalleryView: View {
                     if FeatureFlags.enableDebugLogPhotoGallery && !didLog {
                         print("[DEBUG][PhotoGallery] User: \(String(describing: appState.currentUser))")
                         print("[DEBUG][PhotoGallery] Photo count: \(photos.count)")
-                        let urls = photos.map { $0.baseUrl }
-                        print("[DEBUG][PhotoGallery] Photo URLs: \(urls)")
+                        
+                        // Log first 10 photos with detailed info
+                        let photosToLog = Array(photos.prefix(10))
+                        print("[DEBUG][PhotoGallery] First \(photosToLog.count) photos:")
+                        for (index, photo) in photosToLog.enumerated() {
+                            print("[DEBUG][PhotoGallery] Photo \(index): id=\(photo.id), mediaItemId=\(photo.mediaItemId), url=\(photo.baseUrl)")
+                        }
+                        
+                        // Check for duplicate IDs
+                        let ids = photos.map { $0.id }
+                        let duplicateIds = ids.filter { id in ids.filter { $0 == id }.count > 1 }
+                        if !duplicateIds.isEmpty {
+                            print("[DEBUG][PhotoGallery] WARNING: Duplicate IDs found: \(duplicateIds)")
+                        }
+                        
                         didLog = true
                     }
                 }

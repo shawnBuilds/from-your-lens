@@ -14,8 +14,9 @@ protocol ICloudPhotoServiceProtocol {
 class ICloudPhotoService: ICloudPhotoServiceProtocol {
     
     // MARK: - Properties
-    private var photoCounter = 0
     private let imageManager = PHImageManager.default()
+    private static var globalPhotoCounter = 0
+    private static let photoCounterLock = NSLock()
     
     // MARK: - Photo Library Access
     func requestPhotoLibraryAccess() async -> Bool {
@@ -78,6 +79,15 @@ class ICloudPhotoService: ICloudPhotoServiceProtocol {
         
         if FeatureFlags.enableDebugLogICloudPhotos {
             print("[DEBUG][ICloudPhotoService] Successfully fetched \(photos.count) photos from iCloud")
+            
+            // Log the IDs of fetched photos to check for duplicates
+            let ids = photos.map { $0.id }
+            let duplicateIds = ids.filter { id in ids.filter { $0 == id }.count > 1 }
+            if !duplicateIds.isEmpty {
+                print("[DEBUG][ICloudPhotoService] WARNING: Duplicate IDs in fetched photos: \(duplicateIds)")
+            } else {
+                print("[DEBUG][ICloudPhotoService] All photo IDs are unique")
+            }
         }
         
         return photos
@@ -116,7 +126,11 @@ class ICloudPhotoService: ICloudPhotoServiceProtocol {
     
     // MARK: - Helper Methods
     private func createPhotoFromAsset(_ asset: PHAsset, userId: Int) async throws -> Photo {
-        photoCounter += 1
+        // Use thread-safe counter to ensure unique IDs
+        ICloudPhotoService.photoCounterLock.lock()
+        ICloudPhotoService.globalPhotoCounter += 1
+        let uniqueId = ICloudPhotoService.globalPhotoCounter
+        ICloudPhotoService.photoCounterLock.unlock()
         
         let creationDate = asset.creationDate ?? Date()
         let mediaItemId = asset.localIdentifier
@@ -127,8 +141,12 @@ class ICloudPhotoService: ICloudPhotoServiceProtocol {
         // Create a unique base URL for the asset
         let baseUrl = "icloud://\(mediaItemId)"
         
+        if FeatureFlags.enableDebugLogICloudPhotos {
+            print("[DEBUG][ICloudPhotoService] Creating photo with ID: \(uniqueId), mediaItemId: \(mediaItemId)")
+        }
+        
         return Photo(
-            id: photoCounter,
+            id: uniqueId,
             mediaItemId: mediaItemId,
             userId: userId,
             photoOf: nil, // Will be determined by face detection later
@@ -142,6 +160,16 @@ class ICloudPhotoService: ICloudPhotoServiceProtocol {
             createdAt: Date(),
             updatedAt: Date()
         )
+    }
+    
+    // MARK: - Static Methods
+    static func resetPhotoCounter() {
+        photoCounterLock.lock()
+        globalPhotoCounter = 0
+        photoCounterLock.unlock()
+        if FeatureFlags.enableDebugLogICloudPhotos {
+            print("[DEBUG][ICloudPhotoService] Photo counter reset to 0")
+        }
     }
     
     // MARK: - Image Loading (for future use)

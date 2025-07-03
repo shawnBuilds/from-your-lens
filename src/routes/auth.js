@@ -234,7 +234,7 @@ router.post('/google/callback', async (req, res) => {
             googleId: payload.sub,
             email: payload.email,
             fullName: payload.name,
-            profilePictureUrl: payload.picture
+            profilePictureUrl: null // Don't use Google profile picture - users need to upload selfie
         };
         
         if (Controls.enableDebugLogOAuth) {

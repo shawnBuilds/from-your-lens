@@ -3,6 +3,8 @@ import SwiftUI
 struct PhotosView: View {
     @EnvironmentObject var appState: AppState
     @State private var selectedTab: PhotoTabType = .allPhotos
+    @State private var showingProfilePicturePicker = false
+    @State private var hasPromptedForProfilePicture = false
     
     var filteredPhotos: [Photo] {
         switch selectedTab {
@@ -28,9 +30,49 @@ struct PhotosView: View {
             HeaderView {
                 HStack(spacing: 8) {
                     if let user = appState.currentUser {
-                        Text(user.displayName)
-                            .font(.subheadline)
-                            .foregroundColor(.textColorSecondary)
+                        // Profile Picture Button (clickable for PFP picker)
+                        Button(action: {
+                            showingProfilePicturePicker = true
+                        }) {
+                            AsyncImage(url: URL(string: user.profilePictureUrl ?? APIConfig.profilePicURL)) { phase in
+                                switch phase {
+                                case .empty:
+                                    Circle()
+                                        .fill(Color(.systemGray5))
+                                        .frame(width: 32, height: 32)
+                                        .overlay(
+                                            Image(systemName: "person.fill")
+                                                .foregroundColor(.secondary)
+                                                .font(.system(size: 16))
+                                        )
+                                case .success(let image):
+                                    image
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fill)
+                                        .frame(width: 32, height: 32)
+                                        .clipShape(Circle())
+                                        .overlay(
+                                            Circle()
+                                                .stroke(Color.primaryColor.opacity(0.3), lineWidth: 1)
+                                        )
+                                case .failure:
+                                    Circle()
+                                        .fill(Color(.systemGray5))
+                                        .frame(width: 32, height: 32)
+                                        .overlay(
+                                            Image(systemName: "person.fill")
+                                                .foregroundColor(.secondary)
+                                                .font(.system(size: 16))
+                                        )
+                                @unknown default:
+                                    Circle()
+                                        .fill(Color(.systemGray5))
+                                        .frame(width: 32, height: 32)
+                                }
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Profile picture for \(user.displayName)")
                     }
                     Button(action: {
                         Task { await appState.handleLogout() }
@@ -73,9 +115,28 @@ struct PhotosView: View {
             BatchCompareModal(isPresented: $appState.isBatchCompareModalPresented)
                 .environmentObject(appState)
         }
+        .sheet(isPresented: $showingProfilePicturePicker) {
+            ProfilePicturePickerModal(
+                appState: appState,
+                hasPromptedForProfilePicture: $hasPromptedForProfilePicture,
+                isAutoPrompt: true
+            )
+        }
         .onAppear {
             if FeatureFlags.enableDebugLogICloudPhotos {
                 print("[DEBUG][PhotosView] PhotosView appeared")
+            }
+            
+            // Check if user needs to set profile picture
+            if FeatureFlags.enableAutoProfilePicturePrompt,
+               let user = appState.currentUser, 
+               user.profilePictureUrl == nil, 
+               !hasPromptedForProfilePicture {
+                if FeatureFlags.enableDebugLogAuth {
+                    print("[DEBUG][PhotosView] User has no profile picture, showing PFP picker")
+                }
+                showingProfilePicturePicker = true
+                hasPromptedForProfilePicture = true
             }
             
             // Trigger photo fetching if we have a user but no photos yet

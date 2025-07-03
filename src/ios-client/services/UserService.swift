@@ -3,6 +3,7 @@ import Foundation
 // MARK: - Protocol Definition
 protocol UserServiceProtocol {
     func uploadProfilePicture(_ imageData: Data) async throws -> ProfilePictureResult
+    func removeProfilePicture(userId: Int) async throws -> ProfilePictureResult
 }
 
 class UserService: UserServiceProtocol {
@@ -21,9 +22,7 @@ class UserService: UserServiceProtocol {
             googleId: "mock_google_id",
             email: "user@example.com",
             fullName: "Mock User",
-            profilePictureUrl: "https://example.com/uploaded_profile.jpg",
-            createdAt: Date(),
-            lastLogin: Date()
+            profilePictureUrl: "https://example.com/uploaded_profile.jpg"
         )
         
         return ProfilePictureResult(
@@ -31,6 +30,39 @@ class UserService: UserServiceProtocol {
             user: updatedUser,
             error: nil
         )
+    }
+    
+    func removeProfilePicture(userId: Int) async throws -> ProfilePictureResult {
+        print("[UserService] Removing profile picture...")
+        guard let authToken = UserDefaults.standard.string(forKey: UserDefaultsKeys.authToken) else {
+            throw UserServiceError.invalidData
+        }
+        let url = URL(string: "\(APIConfig.baseURL)/api/users/profile-picture")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+        request.setValue("Bearer \(authToken)", forHTTPHeaderField: "Authorization")
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw UserServiceError.networkError
+        }
+        if httpResponse.statusCode == 200 {
+            let decoder = JSONDecoder()
+            struct RemoveProfilePictureResponse: Codable {
+                let message: String
+                let user: User
+            }
+            let removeResponse = try decoder.decode(RemoveProfilePictureResponse.self, from: data)
+            return ProfilePictureResult(success: true, user: removeResponse.user, error: nil)
+        } else {
+            let errorMessage: String
+            if let errorData = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let msg = errorData["error"] as? String {
+                errorMessage = msg
+            } else {
+                errorMessage = "Failed with status: \(httpResponse.statusCode)"
+            }
+            return ProfilePictureResult(success: false, user: nil, error: errorMessage)
+        }
     }
     
     // MARK: - Additional Methods (to be implemented)

@@ -9,16 +9,16 @@ struct FeatureFlags {
     static let enableGoogleDriveUsage = false
     static let enableSkipAuthFlow = false // Set to true to enable the "skip auth" modal for development
     static let enableDebugLogSkipAuth = false // Debug: log state changes for skip auth/test data
-    static let enableDebugLogPhotoGallery = false // Debug: log data shown in photo gallery
+    static let enableDebugLogPhotoGallery = true // Debug: log data shown in photo gallery
     static let enableDebugLogLandingView = false // Debug: log layout info for landing view
     static let enableLandingGalleryImages = true // Toggle gallery images section in LandingView
     static let enableLandingHowItWorks = true // Toggle how it works section in LandingView
     
     // MARK: - iCloud Photo Integration
-    static let enableICloudPhotoUsage = false // Master switch for iCloud photo functionality
+    static let enableICloudPhotoUsage = true // Master switch for iCloud photo functionality
     static let defaultICloudPhotoCount = 10 // Default number of photos to fetch from iCloud
     static let enableTestUserWithICloudPhotos = false // Use test user with real iCloud photos instead of mock data
-    static let enableDebugLogICloudPhotos = false // Debug: log iCloud photo fetching operations
+    static let enableDebugLogICloudPhotos = true // Debug: log iCloud photo fetching operations
     
     // MARK: - Face Detection Integration
     static let enableFaceDetectionUsage = true // Master switch for face detection functionality
@@ -29,7 +29,9 @@ struct FeatureFlags {
     static let minImageSizeForFaceDetection = 1 * 1024 // 1KB min image size for face detection
     
     // MARK: - OAuth Integration
-    static let enableDebugLogOAuth = false // Debug: log OAuth operations and network requests
+    static let enableDebugLogOAuth = true // Debug: log OAuth operations and network requests
+    static let enableDebugLogAuth = true // Debug: log AuthService operations and token validation
+    static let enableAutoProfilePicturePrompt = true // Auto-show PFP picker for users without profile pictures
 }        
 
 // MARK: - API Configuration

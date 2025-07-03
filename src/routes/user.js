@@ -80,4 +80,41 @@ router.post('/profile-picture', upload.single('profilePicture'), async (req, res
     }
 });
 
+// Remove profile picture
+router.delete('/profile-picture', async (req, res) => {
+    if (Controls.enableDebugLogUser) {
+        console.log('[Profile Picture] Remove request received');
+        console.log('[Profile Picture] Request headers:', {
+            authorization: req.headers.authorization ? 'Bearer token present' : 'No token'
+        });
+    }
+    try {
+        const userId = req.user.id;
+        if (Controls.enableDebugLogUser) {
+            console.log('[Profile Picture] User ID:', userId);
+        }
+        // Set profile_picture_url to null in the database
+        const query = `
+            UPDATE users 
+            SET profile_picture_url = NULL 
+            WHERE id = $1 
+            RETURNING *;
+        `;
+        const result = await pool.query(query, [userId]);
+        if (Controls.enableDebugLogUser) {
+            console.log('[Profile Picture] Database update (remove) successful');
+        }
+        res.json({
+            message: 'Profile picture removed successfully',
+            user: result.rows[0]
+        });
+    } catch (error) {
+        console.error('[Profile Picture] Remove error:', error);
+        res.status(500).json({
+            error: 'Failed to remove profile picture',
+            details: error.message
+        });
+    }
+});
+
 module.exports = router; 

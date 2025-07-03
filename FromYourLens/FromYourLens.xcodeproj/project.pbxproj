@@ -33,6 +33,7 @@
 		294C4D2F2E0C8BD3004CF461 /* PhotoTabsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 294C4D2C2E0C8BD1004CF461 /* PhotoTabsView.swift */; };
 		294C4D302E0C8BD3004CF461 /* MatchingTabsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 294C4D2D2E0C8BD2004CF461 /* MatchingTabsView.swift */; };
 		294C4D312E0C8BD3004CF461 /* Color+Palette.swift in Sources */ = {isa = PBXBuildFile; fileRef = 294C4D2E2E0C8BD2004CF461 /* Color+Palette.swift */; };
+		295105462E16D1B900F5ACD5 /* ProfilePicturePickerModal.swift in Sources */ = {isa = PBXBuildFile; fileRef = 295105452E16D1B900F5ACD5 /* ProfilePicturePickerModal.swift */; };
 		295AEC162E0DC24900D87103 /* ICloudPhotoService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 295AEC152E0DC24800D87103 /* ICloudPhotoService.swift */; };
 		297180022E14384C00366BF4 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = 297180012E14384C00366BF4 /* GoogleSignIn */; };
 		297180042E14384C00366BF4 /* GoogleSignInSwift in Frameworks */ = {isa = PBXBuildFile; productRef = 297180032E14384C00366BF4 /* GoogleSignInSwift */; };
@@ -91,6 +92,7 @@
 		294C4D2C2E0C8BD1004CF461 /* PhotoTabsView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PhotoTabsView.swift; sourceTree = "<group>"; };
 		294C4D2D2E0C8BD2004CF461 /* MatchingTabsView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = MatchingTabsView.swift; sourceTree = "<group>"; };
 		294C4D2E2E0C8BD2004CF461 /* Color+Palette.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "Color+Palette.swift"; sourceTree = "<group>"; };
+		295105452E16D1B900F5ACD5 /* ProfilePicturePickerModal.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ProfilePicturePickerModal.swift; sourceTree = "<group>"; };
 		295AEC152E0DC24800D87103 /* ICloudPhotoService.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ICloudPhotoService.swift; sourceTree = "<group>"; };
 		295AEC172E0DC5DE00D87103 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		297180052E143D6B00366BF4 /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
@@ -222,6 +224,7 @@
 		294C4C922E0AE968004CF461 /* views */ = {
 			isa = PBXGroup;
 			children = (
+				295105452E16D1B900F5ACD5 /* ProfilePicturePickerModal.swift */,
 				29D1F6372E13109A00A68FE9 /* FaceMatchingProgressBar.swift */,
 				29D1F6352E13081100A68FE9 /* BaseCarouselView.swift */,
 				29D1F6332E13056900A68FE9 /* TargetPhotosCarouselView.swift */,
@@ -422,6 +425,7 @@
 				294C4C942E0AE968004CF461 /* APIResults.swift in Sources */,
 				294C4D0D2E0AF913004CF461 /* Constants.swift in Sources */,
 				294C4D172E0B15BA004CF461 /* LoadingView.swift in Sources */,
+				295105462E16D1B900F5ACD5 /* ProfilePicturePickerModal.swift in Sources */,
 				294C4D262E0C705A004CF461 /* PhotoGalleryView.swift in Sources */,
 				29D1F6382E13109A00A68FE9 /* FaceMatchingProgressBar.swift in Sources */,
 				29AE9B712E0EEF6300B4CB91 /* FaceApiService.swift in Sources */,

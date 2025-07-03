@@ -22,3 +22,8 @@ A daily log of completed tasks and milestones.
 - Created Google OAuth client for iOS
 - Adjusted backend authentication to support iOS
 - Integrated Google Sign-In flow with iOS app
+
+## 07/02
+- Fixed authentication issues for iOS users
+- Tested authentication -> iCloud photo access flow
+- Implemented auto-login for returning users
