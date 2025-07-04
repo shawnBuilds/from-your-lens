@@ -27,3 +27,11 @@ A daily log of completed tasks and milestones.
 - Fixed authentication issues for iOS users
 - Tested authentication -> iCloud photo access flow
 - Implemented auto-login for returning users
+
+## 07/03
+- Users can now upload profile pictures for face matching
+- Profile picture picker shown after signup in auth flow
+- Added image cropper tool for profile picture upload
+
+## 07/04
+- Fixed a bug where the matching image preview  always showed the first iCloud photo

@@ -4,6 +4,39 @@ const { upload, getS3Url } = require('../../utils/s3');
 const pool = require('../../db/pool');
 const Controls = require('../controls');
 
+// Get all users (for search functionality)
+router.get('/', async (req, res) => {
+    if (Controls.enableDebugLogUser) {
+        console.log('[Users] Get all users request received');
+    }
+    
+    try {
+        const query = `
+            SELECT id, google_id, email, full_name, profile_picture_url, created_at, last_login
+            FROM users 
+            WHERE id != $1
+            ORDER BY full_name ASC, email ASC;
+        `;
+        
+        const result = await pool.query(query, [req.user.id]);
+        
+        if (Controls.enableDebugLogUser) {
+            console.log('[Users] Retrieved', result.rows.length, 'users');
+        }
+        
+        res.json({
+            users: result.rows,
+            total: result.rows.length
+        });
+    } catch (error) {
+        console.error('[Users] Error getting all users:', error);
+        res.status(500).json({ 
+            error: 'Failed to get users',
+            details: error.message 
+        });
+    }
+});
+
 // Upload profile picture
 router.post('/profile-picture', upload.single('profilePicture'), async (req, res) => {
     if (Controls.enableDebugLogUser) {

@@ -23,7 +23,7 @@ struct FeatureFlags {
     // MARK: - Face Detection Integration
     static let enableFaceDetectionUsage = true // Master switch for face detection functionality
     static let enableDebugLogFaceDetection = false // Debug: log face detection operations
-    static let enableDebugBatchCompareModal = false // Debug: log batch compare modal operations
+    static let enableDebugBatchCompareModal = true // Debug: log batch compare modal operations
     static let faceDetectionSimilarityThreshold = 90.0 // Minimum similarity threshold for face matching
     static let maxImageSizeForFaceDetection = 5 * 1024 * 1024 // 5MB max image size for face detection
     static let minImageSizeForFaceDetection = 1 * 1024 // 1KB min image size for face detection
@@ -94,6 +94,12 @@ enum BatchCompareState: String, CaseIterable {
     case matching = "MATCHING"    // Face matching in progress
     case matched = "MATCHED"      // Matching completed with results
     case error = "ERROR"          // Error occurred during matching
+}
+
+// MARK: - Batch Compare Modes
+enum BatchCompareMode: String, CaseIterable {
+    case findPhotos = "FIND_PHOTOS"    // Find photos of current user
+    case sendPhotos = "SEND_PHOTOS"    // Send photos to another user
 }
 
 // MARK: - Icon URLs

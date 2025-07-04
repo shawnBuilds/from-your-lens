@@ -6,17 +6,24 @@ struct TargetPhotosCarouselView: View {
     
     var body: some View {
         BaseCarouselView(items: photos, currentIndex: $carouselIndex) { currentPhoto in
-            AsyncImage(url: URL(string: currentPhoto.baseUrl)) { image in
-                image
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-            } placeholder: {
-                Rectangle()
-                    .fill(Color.gray.opacity(0.3))
+            BatchComparePhotoView(photo: currentPhoto, size: 220)
+                .id(currentPhoto.id)
+        }
+        .onAppear {
+            if FeatureFlags.enableDebugBatchCompareModal {
+                print("[TargetPhotosCarouselView] onAppear: photos count=\(photos.count)")
+                for (i, p) in photos.enumerated() {
+                    print("[TargetPhotosCarouselView] photos[\(i)]: id=\(p.id), url=\(p.baseUrl)")
+                }
             }
-            .frame(width: 220, height: 220)
-            .clipShape(RoundedRectangle(cornerRadius: 16))
-            .shadow(radius: 8)
+        }
+        .onChange(of: photos) { newPhotos in
+            if FeatureFlags.enableDebugBatchCompareModal {
+                print("[TargetPhotosCarouselView] photos changed: count=\(newPhotos.count)")
+                for (i, p) in newPhotos.enumerated() {
+                    print("[TargetPhotosCarouselView] photos[\(i)]: id=\(p.id), url=\(p.baseUrl)")
+                }
+            }
         }
     }
 } 

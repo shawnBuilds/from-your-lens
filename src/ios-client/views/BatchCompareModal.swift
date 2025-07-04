@@ -13,7 +13,14 @@ struct BatchCompareModal: View {
     private var autoPopulatedTargetPhotos: [Photo] {
         let allPhotos = appState.photos
         let maxCount = FeatureFlags.defaultBatchTargetCount
-        return Array(allPhotos.prefix(maxCount))
+        let result = Array(allPhotos.prefix(maxCount))
+        if FeatureFlags.enableDebugBatchCompareModal {
+            print("[BatchCompareModal] autoPopulatedTargetPhotos computed: count=\(result.count)")
+            for (i, p) in result.enumerated() {
+                print("[BatchCompareModal] autoPopulatedTargetPhotos[\(i)]: id=\(p.id), url=\(p.baseUrl)")
+            }
+        }
+        return result
     }
     
     var body: some View {
@@ -83,6 +90,12 @@ struct BatchCompareModal: View {
         .onAppear {
             // Auto-populate target photos when modal appears
             selectedTargetPhotos = autoPopulatedTargetPhotos
+            if FeatureFlags.enableDebugBatchCompareModal {
+                print("[BatchCompareModal] selectedTargetPhotos set: count=\(selectedTargetPhotos.count)")
+                for (i, p) in selectedTargetPhotos.enumerated() {
+                    print("[BatchCompareModal] selectedTargetPhotos[\(i)]: id=\(p.id), url=\(p.baseUrl)")
+                }
+            }
             
             if FeatureFlags.enableDebugBatchCompareModal {
                 print("[BatchCompareModal] Modal appeared with \(appState.batchCompareResults.count) batch compare results")
@@ -99,9 +112,19 @@ struct BatchCompareModalHeader: View {
     @Binding var isPresented: Bool
     let appState: AppState
     
+    @MainActor
+    var title: String {
+        switch appState.batchCompareMode {
+        case .findPhotos:
+            return "Find Photos of You"
+        case .sendPhotos:
+            return "Send Photos to \(appState.selectedTargetUser?.displayName ?? "Friend")"
+        }
+    }
+    
     var body: some View {
         HStack {
-            Text("Find Photos of You")
+            Text(title)
                 .font(.system(size: 28, weight: .bold))
                 .foregroundColor(.textColorPrimary)
                 .padding(.leading)
@@ -130,12 +153,23 @@ struct BatchCompareModalHeader: View {
 struct SourcePhotoSection: View {
     @Binding var selectedSourcePhoto: Photo?
     @Binding var showingSourcePhotoPicker: Bool
+    let appState: AppState
+    
+    @MainActor
+    var sectionTitle: String {
+        switch appState.batchCompareMode {
+        case .findPhotos:
+            return "Photo of You"
+        case .sendPhotos:
+            return "Photo of \(appState.selectedTargetUser?.displayName ?? "Friend")"
+        }
+    }
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Spacer()
-                Text("Photo of You")
+                Text(sectionTitle)
                     .font(.headline)
                     .fontWeight(.semibold)
                     .foregroundColor(.textColorPrimary)
@@ -162,16 +196,7 @@ struct SourcePhotoSelectedView: View {
     var body: some View {
         HStack {
             Spacer()
-            AsyncImage(url: URL(string: sourcePhoto.baseUrl)) { image in
-                image
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-            } placeholder: {
-                Rectangle()
-                    .fill(Color.gray.opacity(0.3))
-            }
-            .frame(width: 80, height: 80)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
+            BatchComparePhotoView(photo: sourcePhoto, size: 80)
             Spacer()
         }
     }
@@ -245,6 +270,12 @@ struct TargetPhotosSection: View {
             }
         }
         .onAppear {
+            if FeatureFlags.enableDebugBatchCompareModal {
+                print("[BatchCompareModal] TargetPhotosSection onAppear: selectedTargetPhotos count=\(selectedTargetPhotos.count)")
+                for (i, p) in selectedTargetPhotos.enumerated() {
+                    print("[BatchCompareModal] TargetPhotosSection selectedTargetPhotos[\(i)]: id=\(p.id), url=\(p.baseUrl)")
+                }
+            }
             if FeatureFlags.enableDebugLogFaceDetection {
                 print("[TargetPhotosSection] Displaying \(selectedTargetPhotos.count) selected photos out of \(autoPopulatedPhotos.count) auto-populated photos")
             }
@@ -288,16 +319,7 @@ struct ResultsSection: View {
                 if !matchingResults.isEmpty {
                     BaseCarouselView(items: matchingResults, currentIndex: $carouselIndex) { result in
                         ZStack(alignment: .topTrailing) {
-                            AsyncImage(url: URL(string: result.photo.baseUrl)) { image in
-                                image
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fill)
-                            } placeholder: {
-                                Rectangle()
-                                    .fill(Color.gray.opacity(0.3))
-                            }
-                            .frame(width: 220, height: 220)
-                            .clipShape(RoundedRectangle(cornerRadius: 16))
+                            BatchComparePhotoView(photo: result.photo, size: 220)
                             
                             // Overlay X button for removing matching results
                             Button(action: {
@@ -520,11 +542,22 @@ struct WaitingStateContent: View {
     let autoPopulatedPhotos: [Photo]
     let appState: AppState
     
+    @MainActor
+    var buttonText: String {
+        switch appState.batchCompareMode {
+        case .findPhotos:
+            return "Find Photos of You"
+        case .sendPhotos:
+            return "Find Photos of \(appState.selectedTargetUser?.displayName ?? "Friend")"
+        }
+    }
+    
     var body: some View {
         VStack(spacing: 24) {
             SourcePhotoSection(
                 selectedSourcePhoto: $selectedSourcePhoto,
-                showingSourcePhotoPicker: $showingSourcePhotoPicker
+                showingSourcePhotoPicker: $showingSourcePhotoPicker,
+                appState: appState
             )
             
             TargetPhotosSection(
@@ -545,7 +578,7 @@ struct WaitingStateContent: View {
                 }) {
                     HStack {
                         Image(systemName: "magnifyingglass")
-                        Text("Find Photos of You")
+                        Text(buttonText)
                     }
                     .frame(maxWidth: .infinity)
                     .padding()
@@ -569,16 +602,7 @@ struct MatchingStateContent: View {
         VStack(spacing: 24) {
             // Show selected source photo
             if let sourcePhoto = selectedSourcePhoto {
-                AsyncImage(url: URL(string: sourcePhoto.baseUrl)) { image in
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                } placeholder: {
-                    Rectangle()
-                        .fill(Color.gray.opacity(0.3))
-                }
-                .frame(width: 80, height: 80)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
+                BatchComparePhotoView(photo: sourcePhoto, size: 80)
             }
             
             // Show target photos being processed
@@ -712,5 +736,50 @@ struct ErrorStateContent: View {
                 }
             }
         }
+    }
+} 
+
+struct BatchComparePhotoView: View {
+    let photo: Photo
+    let size: CGFloat
+    var body: some View {
+        Group {
+            if photo.baseUrl.hasPrefix("icloud://") {
+                ICloudPhotoView(photo: photo, cellSize: size)
+                    .id(photo.id) // Force state reset when photo changes
+            } else {
+                AsyncImage(url: URL(string: photo.baseUrl)) { phase in
+                    switch phase {
+                    case .empty:
+                        ProgressView()
+                            .frame(width: size, height: size)
+                            .background(Color(.systemGray6))
+                            .cornerRadius(8)
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: size, height: size)
+                            .clipped()
+                            .cornerRadius(8)
+                    case .failure:
+                        VStack {
+                            Image(systemName: "exclamationmark.triangle")
+                                .foregroundColor(.red)
+                                .font(.largeTitle)
+                            Text("Failed to load")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        .frame(width: size, height: size)
+                        .background(Color(.systemGray6))
+                        .cornerRadius(8)
+                    @unknown default:
+                        EmptyView()
+                    }
+                }
+            }
+        }
+        .id(photo.id) // Ensure the whole view resets when photo changes
     }
 } 

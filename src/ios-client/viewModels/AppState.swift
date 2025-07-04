@@ -35,6 +35,13 @@ class AppState: ObservableObject {
     @Published var selectedSourcePhoto: Photo?
     @Published var selectedTargetPhotos: [Photo] = []
     
+    // MARK: - User Search State
+    @Published var allUsers: [User] = []
+    @Published var isFetchingUsers: Bool = false
+    @Published var fetchUsersError: Error?
+    @Published var selectedTargetUser: User?
+    @Published var batchCompareMode: BatchCompareMode = .findPhotos
+    
     // MARK: - Private Properties
     private var cancellables = Set<AnyCancellable>()
     private let authService = AuthService()
@@ -470,6 +477,44 @@ class AppState: ObservableObject {
         isBatchComparing = false
         matchesAttempted = 0
         batchCompareState = .waiting
+        selectedTargetUser = nil
+        batchCompareMode = .findPhotos
+    }
+    
+    // MARK: - User Management Methods
+    func fetchAllUsers() async {
+        guard !isFetchingUsers else { return }
+        
+        isFetchingUsers = true
+        fetchUsersError = nil
+        
+        do {
+            allUsers = try await userService.getAllUsers()
+            if FeatureFlags.enableDebugLogAuth {
+                print("[AppState] Successfully fetched \(allUsers.count) users")
+            }
+        } catch {
+            fetchUsersError = error
+            if FeatureFlags.enableDebugLogAuth {
+                print("[AppState] Error fetching users: \(error)")
+            }
+        }
+        
+        isFetchingUsers = false
+    }
+    
+    func selectTargetUser(_ user: User) {
+        selectedTargetUser = user
+        if FeatureFlags.enableDebugLogAuth {
+            print("[AppState] Selected target user: \(user.displayName)")
+        }
+    }
+    
+    func clearTargetUser() {
+        selectedTargetUser = nil
+        if FeatureFlags.enableDebugLogAuth {
+            print("[AppState] Cleared target user")
+        }
     }
     
     func confirmMatches() async {
@@ -486,11 +531,24 @@ class AppState: ObservableObject {
         var successfulUpdates = 0
         var failedUpdates = 0
         
+        // Determine which user ID to assign based on mode
+        let targetUserId: Int
+        switch batchCompareMode {
+        case .findPhotos:
+            targetUserId = currentUser.id
+        case .sendPhotos:
+            guard let selectedUser = selectedTargetUser else {
+                print("[AppState] No target user selected for send photos mode")
+                return
+            }
+            targetUserId = selectedUser.id
+        }
+        
         for result in matchingResults {
             do {
                 let updatedPhoto = try await photosService.updatePhotoSubject(
                     mediaItemId: result.photo.mediaItemId,
-                    photoOf: currentUser.id
+                    photoOf: targetUserId
                 )
                 
                 // Update the photo in our local photos array
@@ -501,6 +559,10 @@ class AppState: ObservableObject {
             } catch {
                 failedUpdates += 1
             }
+        }
+        
+        if FeatureFlags.enableDebugLogFaceDetection {
+            print("[AppState] Confirmed \(successfulUpdates) matches for user ID: \(targetUserId)")
         }
     }
     

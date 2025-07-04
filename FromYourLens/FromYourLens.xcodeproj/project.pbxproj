@@ -34,6 +34,7 @@
 		294C4D302E0C8BD3004CF461 /* MatchingTabsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 294C4D2D2E0C8BD2004CF461 /* MatchingTabsView.swift */; };
 		294C4D312E0C8BD3004CF461 /* Color+Palette.swift in Sources */ = {isa = PBXBuildFile; fileRef = 294C4D2E2E0C8BD2004CF461 /* Color+Palette.swift */; };
 		295105462E16D1B900F5ACD5 /* ProfilePicturePickerModal.swift in Sources */ = {isa = PBXBuildFile; fileRef = 295105452E16D1B900F5ACD5 /* ProfilePicturePickerModal.swift */; };
+		295105492E16E59400F5ACD5 /* SwiftyCrop in Frameworks */ = {isa = PBXBuildFile; productRef = 295105482E16E59400F5ACD5 /* SwiftyCrop */; };
 		295AEC162E0DC24900D87103 /* ICloudPhotoService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 295AEC152E0DC24800D87103 /* ICloudPhotoService.swift */; };
 		297180022E14384C00366BF4 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = 297180012E14384C00366BF4 /* GoogleSignIn */; };
 		297180042E14384C00366BF4 /* GoogleSignInSwift in Frameworks */ = {isa = PBXBuildFile; productRef = 297180032E14384C00366BF4 /* GoogleSignInSwift */; };
@@ -111,6 +112,7 @@
 			files = (
 				297180022E14384C00366BF4 /* GoogleSignIn in Frameworks */,
 				297180042E14384C00366BF4 /* GoogleSignInSwift in Frameworks */,
+				295105492E16E59400F5ACD5 /* SwiftyCrop in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -284,6 +286,7 @@
 			packageProductDependencies = (
 				297180012E14384C00366BF4 /* GoogleSignIn */,
 				297180032E14384C00366BF4 /* GoogleSignInSwift */,
+				295105482E16E59400F5ACD5 /* SwiftyCrop */,
 			);
 			productName = FromYourLens;
 			productReference = 294C4C342E0AE38C004CF461 /* FromYourLens.app */;
@@ -359,6 +362,7 @@
 			mainGroup = 294C4C2B2E0AE38C004CF461;
 			packageReferences = (
 				297180002E14384C00366BF4 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
+				295105472E16E59400F5ACD5 /* XCRemoteSwiftPackageReference "SwiftyCrop" */,
 			);
 			productRefGroup = 294C4C352E0AE38C004CF461 /* Products */;
 			projectDirPath = "";
@@ -760,6 +764,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		295105472E16E59400F5ACD5 /* XCRemoteSwiftPackageReference "SwiftyCrop" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/benedom/SwiftyCrop";
+			requirement = {
+				branch = master;
+				kind = branch;
+			};
+		};
 		297180002E14384C00366BF4 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/google/GoogleSignIn-iOS";
@@ -771,6 +783,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		295105482E16E59400F5ACD5 /* SwiftyCrop */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 295105472E16E59400F5ACD5 /* XCRemoteSwiftPackageReference "SwiftyCrop" */;
+			productName = SwiftyCrop;
+		};
 		297180012E14384C00366BF4 /* GoogleSignIn */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 297180002E14384C00366BF4 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;

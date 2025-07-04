@@ -1,6 +1,9 @@
 import SwiftUI
 
 struct MatchingTabsView: View {
+    @EnvironmentObject var appState: AppState
+    @State private var showingUserSearchModal = false
+    
     var onFindPhotos: () -> Void
     var onSendPhotos: () -> Void
     
@@ -8,15 +11,25 @@ struct MatchingTabsView: View {
         HStack(spacing: 20) {
             GoldActionButton(
                 label: "Find photos of me",
-                action: onFindPhotos
+                action: {
+                    appState.batchCompareMode = .findPhotos
+                    onFindPhotos()
+                }
             )
             GoldActionButton(
                 label: "Send photos to a friend",
-                action: onSendPhotos
+                action: {
+                    appState.batchCompareMode = .sendPhotos
+                    showingUserSearchModal = true
+                }
             )
         }
         .frame(maxWidth: .infinity)
         .padding(.horizontal, 16)
+        .sheet(isPresented: $showingUserSearchModal) {
+            UserSearchModal(isPresented: $showingUserSearchModal)
+                .environmentObject(appState)
+        }
     }
 }
 

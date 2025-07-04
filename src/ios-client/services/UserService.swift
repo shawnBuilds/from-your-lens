@@ -4,6 +4,7 @@ import Foundation
 protocol UserServiceProtocol {
     func uploadProfilePicture(_ imageData: Data) async throws -> ProfilePictureResult
     func removeProfilePicture(userId: Int) async throws -> ProfilePictureResult
+    func getAllUsers() async throws -> [User]
 }
 
 class UserService: UserServiceProtocol {
@@ -62,6 +63,43 @@ class UserService: UserServiceProtocol {
                 errorMessage = "Failed with status: \(httpResponse.statusCode)"
             }
             return ProfilePictureResult(success: false, user: nil, error: errorMessage)
+        }
+    }
+    
+    // MARK: - Get All Users
+    func getAllUsers() async throws -> [User] {
+        print("[UserService] Fetching all users...")
+        guard let authToken = UserDefaults.standard.string(forKey: UserDefaultsKeys.authToken) else {
+            throw UserServiceError.invalidData
+        }
+        
+        let url = URL(string: "\(APIConfig.baseURL)/api/users")!
+        var request = URLRequest(url: url)
+        request.setValue("Bearer \(authToken)", forHTTPHeaderField: "Authorization")
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw UserServiceError.networkError
+        }
+        
+        if httpResponse.statusCode == 200 {
+            struct GetAllUsersResponse: Codable {
+                let users: [User]
+                let total: Int
+            }
+            let decoder = JSONDecoder()
+            let usersResponse = try decoder.decode(GetAllUsersResponse.self, from: data)
+            print("[UserService] Successfully fetched \(usersResponse.users.count) users")
+            return usersResponse.users
+        } else {
+            let errorMessage: String
+            if let errorData = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let msg = errorData["error"] as? String {
+                errorMessage = msg
+            } else {
+                errorMessage = "Failed with status: \(httpResponse.statusCode)"
+            }
+            throw UserServiceError.networkError
         }
     }
     

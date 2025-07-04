@@ -1,5 +1,6 @@
 import SwiftUI
 import PhotosUI
+import SwiftyCrop
 
 struct ProfilePicturePickerModal: View {
     @Environment(\.dismiss) private var dismiss
@@ -12,6 +13,13 @@ struct ProfilePicturePickerModal: View {
     @State private var isUploading = false
     @State private var uploadError: String?
     @State private var showRemoveConfirmation = false
+    @State private var showCropper = false
+    @State private var croppingImage: UIImage?
+    @State private var pendingCropImage: UIImage?
+    private let userService = UserService()
+    
+    // SwiftyCrop configuration for increased sensitivity
+    private let cropConfig = SwiftyCropConfiguration(zoomSensitivity: 3.0)
     
     init(appState: AppState, hasPromptedForProfilePicture: Binding<Bool>, isAutoPrompt: Bool = false) {
         self.appState = appState
@@ -27,6 +35,7 @@ struct ProfilePicturePickerModal: View {
                     Text("Profile Picture")
                         .font(.title2)
                         .fontWeight(.semibold)
+                        .foregroundColor(.primaryColor)
                     
                     if isAutoPrompt {
                         Text("Please set a profile picture to get started")
@@ -42,144 +51,30 @@ struct ProfilePicturePickerModal: View {
                 }
                 .padding(.top)
                 
-                // Current Profile Picture
-                VStack(spacing: 8) {
-                    Text("Current")
-                        .font(.caption)
-                        .foregroundColor(.textColorSecondary)
-                    
-                    if let user = appState.currentUser {
+                // Main State-Driven Area
+                if let selectedImageData = selectedImageData, let uiImage = UIImage(data: selectedImageData) {
+                    // PREVIEW STATE
+                    VStack(spacing: 8) {
+                        Text("Preview")
+                            .font(.caption)
+                            .foregroundColor(.textColorSecondary)
                         ZStack {
                             Circle()
                                 .fill(Color.secondaryColor)
                                 .frame(width: 140, height: 140)
                                 .shadow(color: .neumorphicShadow.opacity(0.5), radius: 10, x: 0, y: 4)
-                            
-                            AsyncImage(url: URL(string: user.profilePictureUrl ?? "")) { image in
-                                image
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fill)
-                            } placeholder: {
-                                AsyncImage(url: URL(string: APIConfig.profilePicURL)) { phase in
-                                    switch phase {
-                                    case .empty:
-                                        Circle()
-                                            .fill(Color(.systemGray5))
-                                            .frame(width: 120, height: 120)
-                                            .overlay(
-                                                Image(systemName: "person.fill")
-                                                    .foregroundColor(.textColorSecondary)
-                                                    .font(.system(size: 48))
-                                            )
-                                    case .success(let image):
-                                        image
-                                            .resizable()
-                                            .aspectRatio(contentMode: .fill)
-                                            .frame(width: 120, height: 120)
-                                            .clipShape(Circle())
-                                    case .failure:
-                                        Circle()
-                                            .fill(Color(.systemGray5))
-                                            .frame(width: 120, height: 120)
-                                            .overlay(
-                                                Image(systemName: "person.fill")
-                                                    .foregroundColor(.textColorSecondary)
-                                                    .font(.system(size: 48))
-                                            )
-                                    @unknown default:
-                                        Circle()
-                                            .fill(Color(.systemGray5))
-                                            .frame(width: 120, height: 120)
-                                    }
-                                }
-                            }
-                            .frame(width: 120, height: 120)
-                            .clipShape(Circle())
-                        }
-                        .padding(.bottom, 8)
-                        
-                        // Remove Profile Picture Button
-                        if let url = user.profilePictureUrl, !url.isEmpty, url != APIConfig.profilePicURL {
-                            Button(action: { showRemoveConfirmation = true }) {
-                                HStack(spacing: 8) {
-                                    Image(systemName: "trash")
-                                    Text("Remove Profile Picture")
-                                }
-                                .font(.subheadline)
-                                .foregroundColor(.red)
-                                .padding(.vertical, 6)
-                                .padding(.horizontal, 16)
-                                .background(Color.secondaryColor)
-                                .cornerRadius(8)
-                            }
-                            .alert(isPresented: $showRemoveConfirmation) {
-                                Alert(
-                                    title: Text("Remove Profile Picture?"),
-                                    message: Text("Are you sure you want to remove your profile picture?"),
-                                    primaryButton: .destructive(Text("Remove")) {
-                                        Task { await removeProfilePicture() }
-                                    },
-                                    secondaryButton: .cancel()
+                                .overlay(
+                                    Circle()
+                                        .stroke(Color.primaryColor, lineWidth: 3)
                                 )
-                            }
-                        }
-                    }
-                }
-                
-                // Photo Picker
-                VStack(spacing: 24) {
-                    PhotosPicker(
-                        selection: $selectedItem,
-                        matching: .images,
-                        photoLibrary: .shared()
-                    ) {
-                        HStack(spacing: 16) {
-                            Image(systemName: "photo.on.rectangle.angled")
-                                .font(.title)
-                                .foregroundColor(.primaryColor)
-                            
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Choose from Library")
-                                    .font(.headline)
-                                    .foregroundColor(.primaryColor)
-                                
-                                Text("Select a selfie from your photos")
-                                    .font(.caption)
-                                    .foregroundColor(.textColorSecondary)
-                            }
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .font(.caption)
-                                .foregroundColor(.textColorSecondary)
-                        }
-                        .padding()
-                        .background(Color.secondaryColor)
-                        .cornerRadius(14)
-                        .shadow(color: .neumorphicShadow.opacity(0.15), radius: 4, x: 0, y: 2)
-                    }
-                    .onChange(of: selectedItem) { newItem in
-                        Task {
-                            await loadImage(from: newItem)
-                        }
-                    }
-                    
-                    // Selected Image Preview
-                    if let selectedImageData = selectedImageData,
-                       let uiImage = UIImage(data: selectedImageData) {
-                        VStack(spacing: 8) {
-                            Text("Preview")
-                                .font(.caption)
-                                .foregroundColor(.textColorSecondary)
-                            
                             Image(uiImage: uiImage)
                                 .resizable()
                                 .aspectRatio(contentMode: .fill)
                                 .frame(width: 120, height: 120)
                                 .clipShape(Circle())
-                                .overlay(Circle().stroke(Color.blue, lineWidth: 2))
                         }
-                        
-                        // Upload Button
+                        .padding(.bottom, 8)
+                        // Upload Button (in place of Choose from Library)
                         Button(action: {
                             Task {
                                 await uploadProfilePicture(imageData: selectedImageData)
@@ -192,24 +87,149 @@ struct ProfilePicturePickerModal: View {
                                 } else {
                                     Image(systemName: "arrow.up.circle.fill")
                                 }
-                                
                                 Text(isUploading ? "Uploading..." : "Set as Profile Picture")
                                     .fontWeight(.medium)
                             }
                             .frame(maxWidth: .infinity)
                             .padding()
-                            .background(Color.blue)
-                            .foregroundColor(.white)
+                            .background(Color.secondaryColor)
+                            .foregroundColor(.primaryColor)
                             .cornerRadius(12)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(Color.primaryColor, lineWidth: 2)
+                            )
+                            .shadow(color: Color.primaryColor.opacity(0.15), radius: 6, x: 0, y: 2)
                         }
                         .disabled(isUploading)
-                        
                         // Error Message
                         if let uploadError = uploadError {
                             Text(uploadError)
                                 .font(.caption)
                                 .foregroundColor(.red)
                                 .multilineTextAlignment(.center)
+                        }
+                    }
+                } else {
+                    // CURRENT STATE
+                    VStack(spacing: 8) {
+                        Text("Current")
+                            .font(.caption)
+                            .foregroundColor(.textColorSecondary)
+                        if let user = appState.currentUser {
+                            ZStack {
+                                Circle()
+                                    .fill(Color.secondaryColor)
+                                    .frame(width: 140, height: 140)
+                                    .shadow(color: .neumorphicShadow.opacity(0.5), radius: 10, x: 0, y: 4)
+                                    .overlay(
+                                        Circle()
+                                            .stroke(Color.primaryColor, lineWidth: 3)
+                                    )
+                                AsyncImage(url: URL(string: user.profilePictureUrl ?? "")) { image in
+                                    image
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fill)
+                                } placeholder: {
+                                    AsyncImage(url: URL(string: APIConfig.profilePicURL)) { phase in
+                                        switch phase {
+                                        case .empty:
+                                            Circle()
+                                                .fill(Color(.systemGray5))
+                                                .frame(width: 120, height: 120)
+                                                .overlay(
+                                                    Image(systemName: "person.fill")
+                                                        .foregroundColor(.textColorSecondary)
+                                                        .font(.system(size: 48))
+                                                )
+                                        case .success(let image):
+                                            image
+                                                .resizable()
+                                                .aspectRatio(contentMode: .fill)
+                                                .frame(width: 120, height: 120)
+                                                .clipShape(Circle())
+                                        case .failure:
+                                            Circle()
+                                                .fill(Color(.systemGray5))
+                                                .frame(width: 120, height: 120)
+                                                .overlay(
+                                                    Image(systemName: "person.fill")
+                                                        .foregroundColor(.textColorSecondary)
+                                                        .font(.system(size: 48))
+                                                )
+                                        @unknown default:
+                                            Circle()
+                                                .fill(Color(.systemGray5))
+                                                .frame(width: 120, height: 120)
+                                        }
+                                    }
+                                }
+                                .frame(width: 120, height: 120)
+                                .clipShape(Circle())
+                            }
+                            .padding(.bottom, 8)
+                            // Remove Profile Picture Button
+                            if let url = user.profilePictureUrl, !url.isEmpty, url != APIConfig.profilePicURL {
+                                Button(action: { showRemoveConfirmation = true }) {
+                                    HStack(spacing: 8) {
+                                        Image(systemName: "trash")
+                                        Text("Remove Profile Picture")
+                                    }
+                                    .font(.subheadline)
+                                    .foregroundColor(.red)
+                                    .padding(.vertical, 6)
+                                    .padding(.horizontal, 16)
+                                    .background(Color.secondaryColor)
+                                    .cornerRadius(8)
+                                }
+                                .alert(isPresented: $showRemoveConfirmation) {
+                                    Alert(
+                                        title: Text("Remove Profile Picture?"),
+                                        message: Text("Are you sure you want to remove your profile picture?"),
+                                        primaryButton: .destructive(Text("Remove")) {
+                                            Task { await removeProfilePicture() }
+                                        },
+                                        secondaryButton: .cancel()
+                                    )
+                                }
+                            }
+                        }
+                        // Choose from Library Button (in place of upload)
+                        PhotosPicker(
+                            selection: $selectedItem,
+                            matching: .images,
+                            photoLibrary: .shared()
+                        ) {
+                            HStack(spacing: 16) {
+                                Image(systemName: "photo.on.rectangle.angled")
+                                    .font(.title)
+                                    .foregroundColor(.primaryColor)
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("Choose from Library")
+                                        .font(.headline)
+                                        .foregroundColor(.primaryColor)
+                                    Text("Select a selfie from your photos")
+                                        .font(.caption)
+                                        .foregroundColor(.textColorSecondary)
+                                }
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.caption)
+                                    .foregroundColor(.textColorSecondary)
+                            }
+                            .padding()
+                            .background(Color.secondaryColor)
+                            .cornerRadius(14)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 14)
+                                    .stroke(Color.primaryColor, lineWidth: 2)
+                            )
+                            .shadow(color: Color.primaryColor.opacity(0.15), radius: 6, x: 0, y: 2)
+                        }
+                        .onChange(of: selectedItem) { newItem in
+                            Task {
+                                await loadImage(from: newItem)
+                            }
                         }
                     }
                 }
@@ -219,7 +239,7 @@ struct ProfilePicturePickerModal: View {
             .padding(.horizontal, 24)
             .padding(.top, 32)
             .frame(maxHeight: .infinity, alignment: .center)
-            .background(Color(.black).opacity(0.98))
+            .background(Color.secondaryColor)
             .navigationBarTitleDisplayMode(.inline)
             .navigationBarBackButtonHidden(true)
             .toolbar {
@@ -230,15 +250,37 @@ struct ProfilePicturePickerModal: View {
                     .foregroundColor(.primaryColor)
                 }
             }
+            .fullScreenCover(isPresented: $showCropper) {
+                if let croppingImage = croppingImage {
+                    SwiftyCropView(
+                        imageToCrop: croppingImage,
+                        maskShape: .circle,
+                        configuration: cropConfig
+                    ) { croppedImage in
+                        if let croppedImage = croppedImage,
+                           let croppedData = croppedImage.jpegData(compressionQuality: 0.95) {
+                            selectedImageData = croppedData
+                        }
+                        showCropper = false
+                    }
+                }
+            }
+            .onChange(of: pendingCropImage) { newImage in
+                guard let newImage = newImage else { return }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                    croppingImage = newImage
+                    showCropper = true
+                    pendingCropImage = nil
+                }
+            }
         }
     }
     
     private func loadImage(from item: PhotosPickerItem?) async {
         guard let item = item else { return }
-        
         do {
-            if let data = try await item.loadTransferable(type: Data.self) {
-                selectedImageData = data
+            if let data = try await item.loadTransferable(type: Data.self), let uiImage = UIImage(data: data) {
+                pendingCropImage = uiImage
                 uploadError = nil
             }
         } catch {
@@ -354,10 +396,18 @@ struct ProfilePicturePickerModal: View {
         guard let user = appState.currentUser else { return }
         do {
             // Call backend to remove PFP (set to null)
-            try await UserService.shared.removeProfilePicture(userId: user.id)
+            try await userService.removeProfilePicture(userId: user.id)
             // Update local user state
             await MainActor.run {
-                appState.currentUser = user.withProfilePictureUrl(nil)
+                appState.currentUser = User(
+                    id: user.id,
+                    googleId: user.googleId,
+                    email: user.email,
+                    fullName: user.fullName,
+                    profilePictureUrl: nil,
+                    createdAt: user.createdAt,
+                    lastLogin: user.lastLogin
+                )
                 isUploading = false
                 selectedImageData = nil
             }
