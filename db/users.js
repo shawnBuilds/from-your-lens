@@ -121,6 +121,27 @@ const getUserByEmail = async (email) => {
     }
 };
 
+// Get all users except the specified user (for search functionality)
+const getAllUsers = async (excludeUserId) => {
+    const query = `
+        SELECT id, google_id, email, full_name, profile_picture_url, created_at, last_login
+        FROM users 
+        WHERE id != $1
+        ORDER BY full_name ASC NULLS LAST, email ASC;
+    `;
+    
+    try {
+        console.log('[Database] Fetching all users (excluding user ID:', excludeUserId, ')');
+        const result = await pool.query(query, [excludeUserId]);
+        console.log('[Database] Retrieved', result.rows.length, 'users');
+        return result.rows;
+    } catch (err) {
+        console.error('[Database] Error getting all users:', err.message);
+        console.error('[Database] Error stack:', err.stack);
+        throw err;
+    }
+};
+
 // Initialize the database
 const initializeDatabase = async () => {
     try {
@@ -140,5 +161,6 @@ module.exports = {
     getUserByGoogleId,
     getUserByEmail,
     getUserById,
+    getAllUsers,
     createUsersTable
 }; 

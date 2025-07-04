@@ -17,7 +17,7 @@ const Controls = {
     enableDebugLogPhotos: false,       // Google Photos API logs
     enableDebugLogDrive: false,        // Google Drive API logs
     enableDebugLogAuth: false,         // General auth service logs
-    enableDebugLogUser: false,         // User management logs
+    enableDebugLogUser: true,         // User management logs
     enableMockData: true,
     
     // Environment-specific overrides

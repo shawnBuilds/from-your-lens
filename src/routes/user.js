@@ -2,31 +2,25 @@ const express = require('express');
 const router = express.Router();
 const { upload, getS3Url } = require('../../utils/s3');
 const pool = require('../../db/pool');
+const { getAllUsers } = require('../../db/users');
 const Controls = require('../controls');
 
 // Get all users (for search functionality)
 router.get('/', async (req, res) => {
     if (Controls.enableDebugLogUser) {
-        console.log('[Users] Get all users request received');
+        console.log('[Users] Get all users request received for user ID:', req.user.id);
     }
     
     try {
-        const query = `
-            SELECT id, google_id, email, full_name, profile_picture_url, created_at, last_login
-            FROM users 
-            WHERE id != $1
-            ORDER BY full_name ASC, email ASC;
-        `;
-        
-        const result = await pool.query(query, [req.user.id]);
+        const users = await getAllUsers(req.user.id);
         
         if (Controls.enableDebugLogUser) {
-            console.log('[Users] Retrieved', result.rows.length, 'users');
+            console.log('[Users] Returning', users.length, 'users to client');
         }
         
         res.json({
-            users: result.rows,
-            total: result.rows.length
+            users: users,
+            total: users.length
         });
     } catch (error) {
         console.error('[Users] Error getting all users:', error);
@@ -40,39 +34,15 @@ router.get('/', async (req, res) => {
 // Upload profile picture
 router.post('/profile-picture', upload.single('profilePicture'), async (req, res) => {
     if (Controls.enableDebugLogUser) {
-        console.log('[Profile Picture] Upload request received');
-        console.log('[Profile Picture] Request headers:', {
-            contentType: req.headers['content-type'],
-            authorization: req.headers.authorization ? 'Bearer token present' : 'No token'
-        });
+        console.log('[Profile Picture] Upload request received for user ID:', req.user.id);
     }
 
     try {
         if (!req.file) {
-            if (Controls.enableDebugLogUser) {
-                console.log('[Profile Picture] No file uploaded in request');
-            }
             return res.status(400).json({ error: 'No file uploaded' });
         }
 
-        if (Controls.enableDebugLogUser) {
-            console.log('[Profile Picture] File details:', {
-                originalName: req.file.originalname,
-                size: req.file.size,
-                mimetype: req.file.mimetype,
-                key: req.file.key
-            });
-        }
-
-        const userId = req.user.id;
-        if (Controls.enableDebugLogUser) {
-            console.log('[Profile Picture] User ID:', userId);
-        }
-
         const s3Url = getS3Url(req.file.key);
-        if (Controls.enableDebugLogUser) {
-            console.log('[Profile Picture] Generated S3 URL:', s3Url);
-        }
 
         // Update user's profile picture URL in database
         const query = `
@@ -82,21 +52,16 @@ router.post('/profile-picture', upload.single('profilePicture'), async (req, res
             RETURNING *;
         `;
         
-        if (Controls.enableDebugLogUser) {
-            console.log('[Profile Picture] Updating database with new URL');
-        }
-        const result = await pool.query(query, [s3Url, userId]);
-        if (Controls.enableDebugLogUser) {
-            console.log('[Profile Picture] Database update successful');
-        }
+        const result = await pool.query(query, [s3Url, req.user.id]);
         
         const response = {
             message: 'Profile picture uploaded successfully',
             profilePictureUrl: s3Url,
             user: result.rows[0]
         };
+        
         if (Controls.enableDebugLogUser) {
-            console.log('[Profile Picture] Upload completed successfully');
+            console.log('[Profile Picture] Upload completed successfully for user ID:', req.user.id);
         }
         
         res.json(response);
@@ -116,16 +81,9 @@ router.post('/profile-picture', upload.single('profilePicture'), async (req, res
 // Remove profile picture
 router.delete('/profile-picture', async (req, res) => {
     if (Controls.enableDebugLogUser) {
-        console.log('[Profile Picture] Remove request received');
-        console.log('[Profile Picture] Request headers:', {
-            authorization: req.headers.authorization ? 'Bearer token present' : 'No token'
-        });
+        console.log('[Profile Picture] Remove request received for user ID:', req.user.id);
     }
     try {
-        const userId = req.user.id;
-        if (Controls.enableDebugLogUser) {
-            console.log('[Profile Picture] User ID:', userId);
-        }
         // Set profile_picture_url to null in the database
         const query = `
             UPDATE users 
@@ -133,10 +91,12 @@ router.delete('/profile-picture', async (req, res) => {
             WHERE id = $1 
             RETURNING *;
         `;
-        const result = await pool.query(query, [userId]);
+        const result = await pool.query(query, [req.user.id]);
+        
         if (Controls.enableDebugLogUser) {
-            console.log('[Profile Picture] Database update (remove) successful');
+            console.log('[Profile Picture] Remove completed successfully for user ID:', req.user.id);
         }
+        
         res.json({
             message: 'Profile picture removed successfully',
             user: result.rows[0]
