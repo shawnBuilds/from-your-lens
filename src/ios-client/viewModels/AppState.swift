@@ -492,9 +492,6 @@ class AppState: ObservableObject {
             allUsers = try await userService.getAllUsers()
             if FeatureFlags.enableDebugLogAuth || FeatureFlags.enableDebugLogUser {
                 print("[AppState] Successfully fetched \(allUsers.count) users")
-                for (i, user) in allUsers.enumerated() {
-                    print("[AppState] User[\(i)]: id=\(user.id), fullName=\(user.fullName ?? "nil"), email=\(user.email)")
-                }
             }
         } catch {
             fetchUsersError = error

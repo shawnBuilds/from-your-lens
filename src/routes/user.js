@@ -13,7 +13,7 @@ router.get('/', async (req, res) => {
     }
     
     try {
-        const users = await getAllUsers(req.user.id);
+        const users = await getAllUsers();
         
         if (Controls.enableDebugLogUser) {
             console.log('[Users] Returning', users.length, 'users to client');
@@ -21,13 +21,6 @@ router.get('/', async (req, res) => {
         
         // Transform database fields to match iOS client expectations
         const transformedUsers = transformUsersToAPI(users);
-        
-        if (Controls.enableDebugLogUser) {
-            console.log('[Users] Transformed users for iOS client:');
-            transformedUsers.forEach(user => {
-                console.log(`[Users] - User ${user.id}: fullName="${user.fullName}", email="${user.email}"`);
-            });
-        }
         
         res.json({
             users: transformedUsers,

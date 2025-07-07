@@ -36,9 +36,6 @@ const getUserById = async (id) => {
         console.log('[Database] Fetching user by ID:', id);
         const result = await pool.query(query, [id]);
         console.log('[Database] User fetch result:', result.rows[0] ? 'Found' : 'Not found');
-        if (result.rows[0]) {
-            console.log('[Database] Retrieved user full_name:', result.rows[0].full_name);
-        }
         return result.rows[0];
     } catch (err) {
         console.error('[Database] Error getting user by ID:', err.message);
@@ -76,10 +73,8 @@ const upsertUser = async (userData) => {
 
     try {
         console.log('[Database] Upserting user:', userData.email);
-        console.log('[Database] User fullName being stored:', userData.fullName);
         const result = await pool.query(query, values);
         console.log('[Database] User upserted successfully:', userData.email);
-        console.log('[Database] Stored full_name from database:', result.rows[0].full_name);
         return result.rows[0];
     } catch (err) {
         console.error('[Database] Error upserting user:', err.message);
@@ -126,18 +121,17 @@ const getUserByEmail = async (email) => {
     }
 };
 
-// Get all users except the specified user (for search functionality)
-const getAllUsers = async (excludeUserId) => {
+// Get all users (for search functionality)
+const getAllUsers = async () => {
     const query = `
         SELECT id, google_id, email, full_name, profile_picture_url, created_at, last_login
         FROM users 
-        WHERE id != $1
         ORDER BY full_name ASC NULLS LAST, email ASC;
     `;
     
     try {
-        console.log('[Database] Fetching all users (excluding user ID:', excludeUserId, ')');
-        const result = await pool.query(query, [excludeUserId]);
+        console.log('[Database] Fetching all users');
+        const result = await pool.query(query);
         console.log('[Database] Retrieved', result.rows.length, 'users');
         return result.rows;
     } catch (err) {

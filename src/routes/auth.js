@@ -38,11 +38,10 @@ passport.use(new GoogleStrategy({
         if (Controls.enableDebugLogOAuth) {
             console.log('[GoogleOAuth] Strategy - User data to upsert:', userData);
         }
-
         const user = await upsertUser(userData);
         if (Controls.enableDebugLogOAuth) {
-            console.log('[GoogleOAuth] Strategy - User upserted successfully:', user.email);
-            console.log('[GoogleOAuth] Strategy - User ID from database:', user.id);
+            console.log('[GoogleOAuth] User upserted successfully:', user.email);
+            console.log('[GoogleOAuth] User ID from database:', user.id);
         }
         
         return done(null, user);
@@ -208,24 +207,8 @@ router.post('/google/callback', async (req, res) => {
             const payload = ticket.getPayload();
             
             console.log('[GoogleOAuth] Token payload details:');
-            console.log('[GoogleOAuth] - iss (issuer):', payload.iss);
-            console.log('[GoogleOAuth] - aud (audience):', payload.aud);
-            console.log('[GoogleOAuth] - sub (subject):', payload.sub);
             console.log('[GoogleOAuth] - email:', payload.email);
-            console.log('[GoogleOAuth] - email_verified:', payload.email_verified);
             console.log('[GoogleOAuth] - name:', payload.name);
-            console.log('[GoogleOAuth] - picture:', payload.picture);
-            console.log('[GoogleOAuth] - iat (issued at):', new Date(payload.iat * 1000).toISOString());
-            console.log('[GoogleOAuth] - exp (expires at):', new Date(payload.exp * 1000).toISOString());
-            
-            // Verify expected values
-            const expectedIssuer = 'https://accounts.google.com';
-            const expectedAudience = process.env.GOOGLE_CLIENT_ID;
-            
-            console.log('[GoogleOAuth] Token validation checks:');
-            console.log('[GoogleOAuth] - Issuer matches expected:', payload.iss === expectedIssuer);
-            console.log('[GoogleOAuth] - Audience matches expected:', payload.aud === expectedAudience);
-            console.log('[GoogleOAuth] - Token not expired:', payload.exp > Date.now() / 1000);
         }
         
         const payload = ticket.getPayload();
@@ -240,9 +223,6 @@ router.post('/google/callback', async (req, res) => {
         
         if (Controls.enableDebugLogOAuth) {
             console.log('[GoogleOAuth] User data to upsert:', userData);
-            console.log('[GoogleOAuth] Google payload.name value:', payload.name);
-            console.log('[GoogleOAuth] Google payload.name type:', typeof payload.name);
-            console.log('[GoogleOAuth] Google payload.name length:', payload.name ? payload.name.length : 'null');
         }
         const user = await upsertUser(userData);
         if (Controls.enableDebugLogOAuth) {
@@ -263,8 +243,6 @@ router.post('/google/callback', async (req, res) => {
         
         if (Controls.enableDebugLogOAuth) {
             console.log('[GoogleOAuth] JWT token generated successfully');
-            console.log('[GoogleOAuth] JWT token length:', token.length);
-            console.log('[GoogleOAuth] JWT token preview:', token.substring(0, 50) + '...');
         }
         
         // Return JWT response for iOS
@@ -277,8 +255,6 @@ router.post('/google/callback', async (req, res) => {
             console.log('[GoogleOAuth] Sending successful response to iOS');
             console.log('[GoogleOAuth] Response user ID:', response.user.id);
             console.log('[GoogleOAuth] Response user email:', response.user.email);
-            console.log('[GoogleOAuth] Response user fullName:', response.user.fullName);
-            console.log('[GoogleOAuth] Database full_name field:', user.full_name);
         }
         
         res.json(response);
@@ -342,7 +318,7 @@ router.get('/verify-token', verifyJWT, async (req, res) => {
         });
         
         if (Controls.enableDebugLogAuth) {
-            console.log('[Auth] Token verification response - User fullName:', user.full_name);
+            console.log('[Auth] Token verification successful for user:', user.email);
         }
     } catch (error) {
         console.error('[Auth] Error verifying token:', {

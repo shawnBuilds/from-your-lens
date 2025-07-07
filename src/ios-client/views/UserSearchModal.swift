@@ -6,10 +6,16 @@ struct UserSearchModal: View {
     @State private var searchText = ""
     
     var filteredUsers: [User] {
+        // First filter out the current user
+        let usersExcludingCurrent = appState.allUsers.filter { user in
+            user.id != appState.currentUser?.id
+        }
+        
+        // Only show users if there's a search term
         if searchText.isEmpty {
-            return appState.allUsers
+            return []
         } else {
-            return appState.allUsers.filter { user in
+            return usersExcludingCurrent.filter { user in
                 let fullName = user.fullName?.lowercased() ?? ""
                 let email = user.email.lowercased()
                 let searchLower = searchText.lowercased()
@@ -100,13 +106,13 @@ struct UserSearchModal: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if filteredUsers.isEmpty {
                     VStack(spacing: 16) {
-                        Image(systemName: "person.3.fill")
+                        Image(systemName: searchText.isEmpty ? "magnifyingglass" : "person.3.fill")
                             .font(.system(size: 48))
                             .foregroundColor(.textColorSecondary)
-                        Text(searchText.isEmpty ? "No users found" : "No users match your search")
+                        Text(searchText.isEmpty ? "Search for a friend" : "No users match your search")
                             .font(.headline)
                             .foregroundColor(.textColorPrimary)
-                        Text(searchText.isEmpty ? "Other users will appear here once they join" : "Try a different search term")
+                        Text(searchText.isEmpty ? "Type a name or email to find friends" : "Try a different search term")
                             .font(.caption)
                             .foregroundColor(.textColorSecondary)
                             .multilineTextAlignment(.center)
@@ -139,6 +145,12 @@ struct UserSearchModal: View {
                 Task {
                     await appState.fetchAllUsers()
                 }
+            }
+            
+            if FeatureFlags.enableDebugBatchCompareModal {
+                print("[UserSearchModal] Total users: \(appState.allUsers.count)")
+                print("[UserSearchModal] Current user ID: \(appState.currentUser?.id ?? -1)")
+                print("[UserSearchModal] Filtered users (excluding current): \(filteredUsers.count)")
             }
         }
     }
