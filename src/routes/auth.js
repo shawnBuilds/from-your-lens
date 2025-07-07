@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const { getUserById, upsertUser } = require('../../db/users');
+const { transformUserToAPI } = require('../lib/databaseHelpers');
 const Controls = require('../controls');
 
 const router = express.Router();
@@ -269,13 +270,7 @@ router.post('/google/callback', async (req, res) => {
         // Return JWT response for iOS
         const response = {
             token: token,
-            user: {
-                id: user.id,
-                google_id: user.google_id,
-                email: user.email,
-                fullName: user.full_name,
-                profilePictureUrl: user.profile_picture_url
-            }
+            user: transformUserToAPI(user)
         };
         
         if (Controls.enableDebugLogOAuth) {
@@ -343,13 +338,7 @@ router.get('/verify-token', verifyJWT, async (req, res) => {
 
         res.json({ 
             valid: true, 
-            user: {
-                id: user.id,
-                google_id: user.google_id,
-                email: user.email,
-                fullName: user.full_name,
-                profilePictureUrl: user.profile_picture_url
-            }
+            user: transformUserToAPI(user)
         });
         
         if (Controls.enableDebugLogAuth) {

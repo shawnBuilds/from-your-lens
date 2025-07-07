@@ -3,6 +3,7 @@ const router = express.Router();
 const { upload, getS3Url } = require('../../utils/s3');
 const pool = require('../../db/pool');
 const { getAllUsers } = require('../../db/users');
+const { transformUsersToAPI, transformUserToAPI } = require('../lib/databaseHelpers');
 const Controls = require('../controls');
 
 // Get all users (for search functionality)
@@ -18,9 +19,19 @@ router.get('/', async (req, res) => {
             console.log('[Users] Returning', users.length, 'users to client');
         }
         
+        // Transform database fields to match iOS client expectations
+        const transformedUsers = transformUsersToAPI(users);
+        
+        if (Controls.enableDebugLogUser) {
+            console.log('[Users] Transformed users for iOS client:');
+            transformedUsers.forEach(user => {
+                console.log(`[Users] - User ${user.id}: fullName="${user.fullName}", email="${user.email}"`);
+            });
+        }
+        
         res.json({
-            users: users,
-            total: users.length
+            users: transformedUsers,
+            total: transformedUsers.length
         });
     } catch (error) {
         console.error('[Users] Error getting all users:', error);
@@ -57,7 +68,7 @@ router.post('/profile-picture', upload.single('profilePicture'), async (req, res
         const response = {
             message: 'Profile picture uploaded successfully',
             profilePictureUrl: s3Url,
-            user: result.rows[0]
+            user: transformUserToAPI(result.rows[0])
         };
         
         if (Controls.enableDebugLogUser) {
@@ -99,7 +110,7 @@ router.delete('/profile-picture', async (req, res) => {
         
         res.json({
             message: 'Profile picture removed successfully',
-            user: result.rows[0]
+            user: transformUserToAPI(result.rows[0])
         });
     } catch (error) {
         console.error('[Profile Picture] Remove error:', error);
