@@ -34,4 +34,6 @@ A daily log of completed tasks and milestones.
 - Added image cropper tool for profile picture upload
 
 ## 07/04
+- Implemented end-to-end user search for sending photos to other users
+- Automatically show users their friend's PFPs when sending photos to them
 - Fixed a bug where the matching image preview  always showed the first iCloud photo

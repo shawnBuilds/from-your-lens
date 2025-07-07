@@ -31,6 +31,7 @@ struct FeatureFlags {
     // MARK: - OAuth Integration
     static let enableDebugLogOAuth = true // Debug: log OAuth operations and network requests
     static let enableDebugLogAuth = true // Debug: log AuthService operations and token validation
+    static let enableDebugLogUser = false // Debug: log user fetch/search operations
     static let enableAutoProfilePicturePrompt = true // Auto-show PFP picker for users without profile pictures
 }        
 
@@ -56,7 +57,7 @@ struct GoogleOAuthConfig {
     // MARK: - Client Configuration
     static let clientID = "374611061345-5op1h3i3pp2a53jo7t71e705qvomg5m4.apps.googleusercontent.com"
     
-    // MARK: - Server Configuration
+    // MARK: - Server Configuration``
     static let serverURL: String = {
         if APIConfig.useProductionServer {
             return "https://fromyourlens-904e01076638.herokuapp.com"

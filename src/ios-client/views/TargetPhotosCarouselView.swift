@@ -12,17 +12,11 @@ struct TargetPhotosCarouselView: View {
         .onAppear {
             if FeatureFlags.enableDebugBatchCompareModal {
                 print("[TargetPhotosCarouselView] onAppear: photos count=\(photos.count)")
-                for (i, p) in photos.enumerated() {
-                    print("[TargetPhotosCarouselView] photos[\(i)]: id=\(p.id), url=\(p.baseUrl)")
-                }
             }
         }
         .onChange(of: photos) { newPhotos in
             if FeatureFlags.enableDebugBatchCompareModal {
                 print("[TargetPhotosCarouselView] photos changed: count=\(newPhotos.count)")
-                for (i, p) in newPhotos.enumerated() {
-                    print("[TargetPhotosCarouselView] photos[\(i)]: id=\(p.id), url=\(p.baseUrl)")
-                }
             }
         }
     }

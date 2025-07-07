@@ -36,6 +36,9 @@ const getUserById = async (id) => {
         console.log('[Database] Fetching user by ID:', id);
         const result = await pool.query(query, [id]);
         console.log('[Database] User fetch result:', result.rows[0] ? 'Found' : 'Not found');
+        if (result.rows[0]) {
+            console.log('[Database] Retrieved user full_name:', result.rows[0].full_name);
+        }
         return result.rows[0];
     } catch (err) {
         console.error('[Database] Error getting user by ID:', err.message);
@@ -73,8 +76,10 @@ const upsertUser = async (userData) => {
 
     try {
         console.log('[Database] Upserting user:', userData.email);
+        console.log('[Database] User fullName being stored:', userData.fullName);
         const result = await pool.query(query, values);
         console.log('[Database] User upserted successfully:', userData.email);
+        console.log('[Database] Stored full_name from database:', result.rows[0].full_name);
         return result.rows[0];
     } catch (err) {
         console.error('[Database] Error upserting user:', err.message);

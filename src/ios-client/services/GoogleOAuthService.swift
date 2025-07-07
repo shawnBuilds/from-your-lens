@@ -211,6 +211,8 @@ class GoogleOAuthService: ObservableObject {
                 print("[GoogleOAuth] User ID: \(jwtResponse.user.id)")
                 print("[GoogleOAuth] User email: \(jwtResponse.user.email)")
                 print("[GoogleOAuth] User googleId: \(jwtResponse.user.googleId)")
+                print("[GoogleOAuth] User fullName: \(jwtResponse.user.fullName ?? "nil")")
+                print("[GoogleOAuth] User displayName: \(jwtResponse.user.displayName)")
             }
             return jwtResponse
         } catch {
@@ -283,6 +285,8 @@ class GoogleOAuthService: ObservableObject {
         let verifyResponse = try JSONDecoder().decode(VerifyTokenResponse.self, from: data)
         if FeatureFlags.enableDebugLogOAuth {
             print("[GoogleOAuth] Successfully fetched user data for: \(verifyResponse.user.email)")
+            print("[GoogleOAuth] User fullName from verify: \(verifyResponse.user.fullName ?? "nil")")
+            print("[GoogleOAuth] User displayName from verify: \(verifyResponse.user.displayName)")
         }
         return verifyResponse.user
     }

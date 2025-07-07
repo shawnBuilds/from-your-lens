@@ -239,6 +239,9 @@ router.post('/google/callback', async (req, res) => {
         
         if (Controls.enableDebugLogOAuth) {
             console.log('[GoogleOAuth] User data to upsert:', userData);
+            console.log('[GoogleOAuth] Google payload.name value:', payload.name);
+            console.log('[GoogleOAuth] Google payload.name type:', typeof payload.name);
+            console.log('[GoogleOAuth] Google payload.name length:', payload.name ? payload.name.length : 'null');
         }
         const user = await upsertUser(userData);
         if (Controls.enableDebugLogOAuth) {
@@ -279,6 +282,8 @@ router.post('/google/callback', async (req, res) => {
             console.log('[GoogleOAuth] Sending successful response to iOS');
             console.log('[GoogleOAuth] Response user ID:', response.user.id);
             console.log('[GoogleOAuth] Response user email:', response.user.email);
+            console.log('[GoogleOAuth] Response user fullName:', response.user.fullName);
+            console.log('[GoogleOAuth] Database full_name field:', user.full_name);
         }
         
         res.json(response);
@@ -346,6 +351,10 @@ router.get('/verify-token', verifyJWT, async (req, res) => {
                 profilePictureUrl: user.profile_picture_url
             }
         });
+        
+        if (Controls.enableDebugLogAuth) {
+            console.log('[Auth] Token verification response - User fullName:', user.full_name);
+        }
     } catch (error) {
         console.error('[Auth] Error verifying token:', {
             error: error.message,

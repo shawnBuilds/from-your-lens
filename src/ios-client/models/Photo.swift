@@ -76,6 +76,25 @@ extension Photo {
         updatedAt: Date()
     )
     
+    // MARK: - Profile Picture Helper
+    static func fromProfilePicture(url: String, userId: Int) -> Photo {
+        return Photo(
+            id: -1, // Special ID for profile picture
+            mediaItemId: "profile_picture_\(userId)",
+            userId: userId,
+            photoOf: userId,
+            altText: "Profile picture",
+            tags: ["profile", "portrait"],
+            baseUrl: url,
+            mimeType: "image/jpeg",
+            width: 400, // Default profile picture dimensions
+            height: 400,
+            creationTime: Date(),
+            createdAt: Date(),
+            updatedAt: Date()
+        )
+    }
+    
     static let mockPhotos = [
         Photo(
             id: 1,

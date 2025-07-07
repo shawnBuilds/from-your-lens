@@ -12,11 +12,11 @@ const Controls = {
     enableDatabaseInitialization: true,
     
     // Development Controls - Specific debug flags to reduce console noise
-    enableDebugLogOAuth: false,        // Google OAuth flow logs
+    enableDebugLogOAuth: true,        // Google OAuth flow logs
     enableDebugLogFaceDetection: false, // Face detection/comparison logs
     enableDebugLogPhotos: false,       // Google Photos API logs
     enableDebugLogDrive: false,        // Google Drive API logs
-    enableDebugLogAuth: false,         // General auth service logs
+    enableDebugLogAuth: true,         // General auth service logs
     enableDebugLogUser: true,         // User management logs
     enableMockData: true,
     

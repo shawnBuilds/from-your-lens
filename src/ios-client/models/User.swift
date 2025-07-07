@@ -32,6 +32,12 @@ struct User: Codable, Identifiable, Equatable {
         fullName = try container.decodeIfPresent(String.self, forKey: .fullName)
         profilePictureUrl = try container.decodeIfPresent(String.self, forKey: .profilePictureUrl)
         
+        // Debug logging for full name decoding
+        if FeatureFlags.enableDebugLogOAuth {
+            print("[User] Decoded fullName: \(fullName ?? "nil")")
+            print("[User] Decoded profilePictureUrl: \(profilePictureUrl ?? "nil")")
+        }
+        
         // Date fields with fallbacks - use current date if not provided
         if let createdAtString = try container.decodeIfPresent(String.self, forKey: .createdAt) {
             let formatter = ISO8601DateFormatter()

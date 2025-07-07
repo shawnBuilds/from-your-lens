@@ -490,12 +490,15 @@ class AppState: ObservableObject {
         
         do {
             allUsers = try await userService.getAllUsers()
-            if FeatureFlags.enableDebugLogAuth {
+            if FeatureFlags.enableDebugLogAuth || FeatureFlags.enableDebugLogUser {
                 print("[AppState] Successfully fetched \(allUsers.count) users")
+                for (i, user) in allUsers.enumerated() {
+                    print("[AppState] User[\(i)]: id=\(user.id), fullName=\(user.fullName ?? "nil"), email=\(user.email)")
+                }
             }
         } catch {
             fetchUsersError = error
-            if FeatureFlags.enableDebugLogAuth {
+            if FeatureFlags.enableDebugLogAuth || FeatureFlags.enableDebugLogUser {
                 print("[AppState] Error fetching users: \(error)")
             }
         }
@@ -505,8 +508,16 @@ class AppState: ObservableObject {
     
     func selectTargetUser(_ user: User) {
         selectedTargetUser = user
-        if FeatureFlags.enableDebugLogAuth {
+        if FeatureFlags.enableDebugLogAuth || FeatureFlags.enableDebugBatchCompareModal {
             print("[AppState] Selected target user: \(user.displayName)")
+        }
+        
+        // Auto-present batch compare modal for send photos mode
+        if batchCompareMode == .sendPhotos {
+            if FeatureFlags.enableDebugBatchCompareModal {
+                print("[AppState] Auto-presenting batch compare modal for send photos mode")
+            }
+            isBatchCompareModalPresented = true
         }
     }
     

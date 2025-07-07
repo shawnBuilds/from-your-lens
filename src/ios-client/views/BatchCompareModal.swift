@@ -8,6 +8,7 @@ struct BatchCompareModal: View {
     @State private var selectedTargetPhotos: [Photo] = []
     @State private var showingSourcePhotoPicker = false
     @State private var showingTargetPhotoPicker = false
+    @State private var showingProfilePicturePicker = false
     
     // Auto-populate target photos when modal appears
     private var autoPopulatedTargetPhotos: [Photo] {
@@ -15,12 +16,24 @@ struct BatchCompareModal: View {
         let maxCount = FeatureFlags.defaultBatchTargetCount
         let result = Array(allPhotos.prefix(maxCount))
         if FeatureFlags.enableDebugBatchCompareModal {
-            print("[BatchCompareModal] autoPopulatedTargetPhotos computed: count=\(result.count)")
-            for (i, p) in result.enumerated() {
-                print("[BatchCompareModal] autoPopulatedTargetPhotos[\(i)]: id=\(p.id), url=\(p.baseUrl)")
-            }
+            print("[BatchCompareModal] Auto-populated \(result.count) target photos")
         }
         return result
+    }
+    
+    // Auto-populate source photo with profile picture when available
+    private var autoPopulatedSourcePhoto: Photo? {
+        guard let user = appState.currentUser,
+              let profileUrl = user.profilePictureUrl,
+              !profileUrl.isEmpty else {
+            return nil
+        }
+        
+        let profilePhoto = Photo.fromProfilePicture(url: profileUrl, userId: user.id)
+        if FeatureFlags.enableDebugBatchCompareModal {
+            print("[BatchCompareModal] Auto-populated source photo with profile picture: \(profileUrl)")
+        }
+        return profilePhoto
     }
     
     var body: some View {
@@ -41,6 +54,7 @@ struct BatchCompareModal: View {
                                 selectedTargetPhotos: $selectedTargetPhotos,
                                 showingSourcePhotoPicker: $showingSourcePhotoPicker,
                                 showingTargetPhotoPicker: $showingTargetPhotoPicker,
+                                showingProfilePicturePicker: $showingProfilePicturePicker,
                                 autoPopulatedPhotos: autoPopulatedTargetPhotos,
                                 appState: appState
                             )
@@ -87,20 +101,41 @@ struct BatchCompareModal: View {
         .sheet(isPresented: $showingTargetPhotoPicker) {
             PhotoPickerView(selectedPhotos: $selectedTargetPhotos, maxSelection: 10, title: "Choose Target Photos")
         }
-        .onAppear {
-            // Auto-populate target photos when modal appears
-            selectedTargetPhotos = autoPopulatedTargetPhotos
-            if FeatureFlags.enableDebugBatchCompareModal {
-                print("[BatchCompareModal] selectedTargetPhotos set: count=\(selectedTargetPhotos.count)")
-                for (i, p) in selectedTargetPhotos.enumerated() {
-                    print("[BatchCompareModal] selectedTargetPhotos[\(i)]: id=\(p.id), url=\(p.baseUrl)")
+        .sheet(isPresented: $showingProfilePicturePicker) {
+            ProfilePicturePickerModal(
+                appState: appState,
+                hasPromptedForProfilePicture: .constant(false),
+                isAutoPrompt: false
+            )
+        }
+        .onChange(of: showingProfilePicturePicker) { isPresented in
+            // When profile picture picker is dismissed, check if we should auto-populate source photo
+            if !isPresented && selectedSourcePhoto == nil {
+                selectedSourcePhoto = autoPopulatedSourcePhoto
+                if FeatureFlags.enableDebugBatchCompareModal {
+                    if let sourcePhoto = selectedSourcePhoto {
+                        print("[BatchCompareModal] Auto-populated source photo after PFP picker dismissal: \(sourcePhoto.baseUrl)")
+                    }
                 }
             }
-            
+        }
+        .onAppear {
             if FeatureFlags.enableDebugBatchCompareModal {
-                print("[BatchCompareModal] Modal appeared with \(appState.batchCompareResults.count) batch compare results")
-                for (index, result) in appState.batchCompareResults.enumerated() {
-                    print("[BatchCompareModal] Result \(index): \(result.targetFileName), has photo: \(result.photo.baseUrl)")
+                print("[BatchCompareModal] Modal appeared - mode: \(appState.batchCompareMode), target: \(appState.selectedTargetUser?.displayName ?? "nil")")
+            }
+            
+            // Auto-populate target photos when modal appears
+            selectedTargetPhotos = autoPopulatedTargetPhotos
+            
+            // Auto-populate source photo with profile picture when available
+            if selectedSourcePhoto == nil {
+                selectedSourcePhoto = autoPopulatedSourcePhoto
+                if FeatureFlags.enableDebugBatchCompareModal {
+                    if let sourcePhoto = selectedSourcePhoto {
+                        print("[BatchCompareModal] Auto-populated source photo")
+                    } else {
+                        print("[BatchCompareModal] No profile picture available for auto-population")
+                    }
                 }
             }
         }
@@ -153,6 +188,7 @@ struct BatchCompareModalHeader: View {
 struct SourcePhotoSection: View {
     @Binding var selectedSourcePhoto: Photo?
     @Binding var showingSourcePhotoPicker: Bool
+    @Binding var showingProfilePicturePicker: Bool
     let appState: AppState
     
     @MainActor
@@ -182,7 +218,16 @@ struct SourcePhotoSection: View {
                 }
             } else {
                 SourcePhotoPickerButton {
-                    showingSourcePhotoPicker = true
+                    // Check if user has a profile picture
+                    if let user = appState.currentUser,
+                       let profileUrl = user.profilePictureUrl,
+                       !profileUrl.isEmpty {
+                        // User has profile picture, show regular photo picker
+                        showingSourcePhotoPicker = true
+                    } else {
+                        // No profile picture, show profile picture picker
+                        showingProfilePicturePicker = true
+                    }
                 }
             }
         }
@@ -209,7 +254,7 @@ struct SourcePhotoPickerButton: View {
         Button(action: action) {
             HStack {
                 Image(systemName: "photo")
-                Text("Choose Source Photo")
+                Text("Choose Profile Picture")
             }
             .frame(maxWidth: .infinity)
             .padding()
@@ -270,12 +315,6 @@ struct TargetPhotosSection: View {
             }
         }
         .onAppear {
-            if FeatureFlags.enableDebugBatchCompareModal {
-                print("[BatchCompareModal] TargetPhotosSection onAppear: selectedTargetPhotos count=\(selectedTargetPhotos.count)")
-                for (i, p) in selectedTargetPhotos.enumerated() {
-                    print("[BatchCompareModal] TargetPhotosSection selectedTargetPhotos[\(i)]: id=\(p.id), url=\(p.baseUrl)")
-                }
-            }
             if FeatureFlags.enableDebugLogFaceDetection {
                 print("[TargetPhotosSection] Displaying \(selectedTargetPhotos.count) selected photos out of \(autoPopulatedPhotos.count) auto-populated photos")
             }
@@ -345,9 +384,6 @@ struct ResultsSection: View {
                     .onAppear {
                         if FeatureFlags.enableDebugBatchCompareModal {
                             print("[BatchCompareModal] Displaying \(matchingResults.count) matching results")
-                            for (index, result) in matchingResults.enumerated() {
-                                print("[BatchCompareModal] Result \(index): \(result.targetFileName), URL: \(result.photo.baseUrl)")
-                            }
                         }
                     }
                 } else {
@@ -539,6 +575,7 @@ struct WaitingStateContent: View {
     @Binding var selectedTargetPhotos: [Photo]
     @Binding var showingSourcePhotoPicker: Bool
     @Binding var showingTargetPhotoPicker: Bool
+    @Binding var showingProfilePicturePicker: Bool
     let autoPopulatedPhotos: [Photo]
     let appState: AppState
     
@@ -557,6 +594,7 @@ struct WaitingStateContent: View {
             SourcePhotoSection(
                 selectedSourcePhoto: $selectedSourcePhoto,
                 showingSourcePhotoPicker: $showingSourcePhotoPicker,
+                showingProfilePicturePicker: $showingProfilePicturePicker,
                 appState: appState
             )
             

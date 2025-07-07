@@ -117,6 +117,9 @@ struct UserSearchModal: View {
                         LazyVStack(spacing: 0) {
                             ForEach(filteredUsers) { user in
                                 UserRowView(user: user) {
+                                    if FeatureFlags.enableDebugBatchCompareModal {
+                                        print("[UserSearchModal] User selected: \(user.displayName) (id: \(user.id))")
+                                    }
                                     appState.selectTargetUser(user)
                                     isPresented = false
                                 }
@@ -145,6 +148,14 @@ struct UserRowView: View {
     let user: User
     let onSelect: () -> Void
     
+    var displayName: String {
+        if let name = user.fullName, !name.trimmingCharacters(in: .whitespaces).isEmpty {
+            return name
+        } else {
+            return user.email
+        }
+    }
+    
     var body: some View {
         Button(action: onSelect) {
             HStack(spacing: 16) {
@@ -168,7 +179,7 @@ struct UserRowView: View {
                 
                 // User Info
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(user.displayName)
+                    Text(displayName)
                         .font(.headline)
                         .foregroundColor(.textColorPrimary)
                         .lineLimit(1)
