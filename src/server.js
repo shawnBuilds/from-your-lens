@@ -29,8 +29,19 @@ app.use(cors({
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+
+// Request size logging middleware
+app.use((req, res, next) => {
+    const contentLength = req.headers['content-length'];
+    if (contentLength) {
+        const sizeInMB = (parseInt(contentLength) / (1024 * 1024)).toFixed(2);
+        console.log(`[Server] Request size: ${sizeInMB}MB for ${req.method} ${req.path}`);
+    }
+    next();
+});
+// Increase body parser limits for image uploads (50MB limit)
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Session configuration for OAuth
 app.use(session({
