@@ -15,12 +15,19 @@ router.use(verifyJWT);
  */
 router.post('/upload-shared', async (req, res) => {
     try {
-        const { mediaItemIds, sharedWithUserId } = req.body;
+        const { mediaItemIds, photos, sharedWithUserId } = req.body;
         
         if (!mediaItemIds || !Array.isArray(mediaItemIds) || mediaItemIds.length === 0) {
             return res.status(400).json({
                 error: 'mediaItemIds array is required',
                 code: 'INVALID_MEDIA_ITEM_IDS'
+            });
+        }
+        
+        if (!photos || !Array.isArray(photos) || photos.length === 0) {
+            return res.status(400).json({
+                error: 'photos array with image data is required',
+                code: 'INVALID_PHOTOS_DATA'
             });
         }
         
@@ -33,66 +40,103 @@ router.post('/upload-shared', async (req, res) => {
         
         if (Controls.enableDebugLogPhotoUpload) {
             console.log(`[Photos] Uploading ${mediaItemIds.length} photos to S3 for sharing with user ${sharedWithUserId}`);
+            console.log(`[Photos] Received photos data:`, photos.map(p => ({ 
+                hasImageData: !!p.imageData, 
+                imageDataLength: p.imageData ? p.imageData.length : 0,
+                mimeType: p.mimeType,
+                baseUrl: p.baseUrl
+            })));
         }
+        
+        console.log(`[Photos] Starting processing loop for ${mediaItemIds.length} photos`);
         
         const results = [];
         const errors = [];
         
         // Process each photo
-        for (const mediaItemId of mediaItemIds) {
+        for (let i = 0; i < mediaItemIds.length; i++) {
+            const mediaItemId = mediaItemIds[i];
+            const photoData = photos[i];
+            
+            console.log(`[Photos] Processing photo ${i + 1}/${mediaItemIds.length}: ${mediaItemId}`);
+            
             try {
-                // Get the photo from database
-                const photo = await photosDb.getPhotoByMediaItemId(mediaItemId);
-                
-                if (!photo) {
+                if (!photoData || !photoData.imageData) {
+                    console.log(`[Photos] Photo ${mediaItemId} missing image data`);
                     errors.push({
                         mediaItemId,
-                        error: 'Photo not found in database'
+                        error: 'Photo image data is missing'
                     });
                     continue;
                 }
                 
-                // Verify ownership
-                if (photo.user_id !== req.user.id) {
-                    errors.push({
-                        mediaItemId,
-                        error: 'Unauthorized access to photo'
-                    });
-                    continue;
-                }
+                console.log(`[Photos] Converting base64 image data for ${mediaItemId}`);
+                // Convert base64 image data to buffer
+                const imageBuffer = Buffer.from(photoData.imageData, 'base64');
+                console.log(`[Photos] Image buffer created, size: ${imageBuffer.length} bytes`);
+                
+                // Generate S3 key
+                const s3Key = generateS3Key(mediaItemId, req.user.id, sharedWithUserId);
+                console.log(`[Photos] Generated S3 key: ${s3Key}`);
+                
+                // Determine content type
+                const contentType = photoData.mimeType || 'image/jpeg';
                 
                 // Upload to S3
-                const uploadResult = await uploadPhotoToS3(photo, req.user.id, sharedWithUserId);
-                
-                if (uploadResult.success) {
-                    // Update database with S3 info
-                    const updatedPhoto = await photosDb.updatePhotoS3Info(
-                        mediaItemId,
-                        uploadResult.s3Key,
-                        uploadResult.s3Url
-                    );
-                    
-                    results.push({
-                        mediaItemId,
-                        success: true,
-                        s3Key: uploadResult.s3Key,
-                        s3Url: uploadResult.s3Url
-                    });
-                    
-                    if (Controls.enableDebugLogPhotoUpload) {
-                        console.log(`[Photos] Successfully uploaded photo ${mediaItemId} to S3`);
+                const uploadParams = {
+                    Bucket: process.env.AWS_BUCKET_NAME,
+                    Key: s3Key,
+                    Body: imageBuffer,
+                    ContentType: contentType,
+                    Metadata: {
+                        originalUserId: req.user.id.toString(),
+                        sharedWithUserId: sharedWithUserId.toString(),
+                        mediaItemId: mediaItemId,
+                        originalUrl: photoData.baseUrl || 'icloud://' + mediaItemId
                     }
-                } else {
-                    errors.push({
-                        mediaItemId,
-                        error: uploadResult.error
-                    });
+                };
+                
+                console.log(`[Photos] Creating S3 client for ${mediaItemId}`);
+                const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
+                const s3Client = new S3Client({
+                    region: process.env.AWS_REGION,
+                    credentials: {
+                        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+                        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY
+                    }
+                });
+                
+                console.log(`[Photos] Uploading to S3 for ${mediaItemId}...`);
+                await s3Client.send(new PutObjectCommand(uploadParams));
+                console.log(`[Photos] S3 upload completed for ${mediaItemId}`);
+                
+                // Generate S3 URL
+                const s3Url = `https://${process.env.AWS_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${s3Key}`;
+                
+                console.log(`[Photos] Updating database for ${mediaItemId}`);
+                // Update database with S3 info if photo exists
+                try {
+                    await photosDb.updatePhotoS3Info(mediaItemId, s3Key, s3Url);
+                    console.log(`[Photos] Database updated for ${mediaItemId}`);
+                } catch (dbError) {
+                    console.log(`[Photos] Photo ${mediaItemId} not in database, skipping DB update: ${dbError.message}`);
+                }
+                
+                results.push({
+                    mediaItemId,
+                    success: true,
+                    s3Key,
+                    s3Url
+                });
+                console.log(`[Photos] Added ${mediaItemId} to results array`);
+                
+                if (Controls.enableDebugLogPhotoUpload) {
+                    console.log(`[Photos] Successfully uploaded photo ${mediaItemId} to S3`);
                 }
                 
             } catch (error) {
-                if (Controls.enableDebugLogPhotoUpload) {
-                    console.error(`[Photos] Error processing photo ${mediaItemId}:`, error);
-                }
+                console.error(`[Photos] Error processing photo ${mediaItemId}:`, error);
+                console.error(`[Photos] Error stack:`, error.stack);
                 errors.push({
                     mediaItemId,
                     error: error.message
@@ -100,6 +144,7 @@ router.post('/upload-shared', async (req, res) => {
             }
         }
         
+        console.log(`[Photos] Processing complete. Sending response: ${results.length} successful, ${errors.length} failed`);
         res.json({
             success: true,
             results,
@@ -119,6 +164,20 @@ router.post('/upload-shared', async (req, res) => {
         });
     }
 });
+
+/**
+ * Generate S3 key for shared photos
+ * @param {string} mediaItemId - Original media item ID
+ * @param {number} originalUserId - ID of user who owns the photo
+ * @param {number} sharedWithUserId - ID of user the photo is being shared with
+ * @returns {string} S3 key
+ */
+const generateS3Key = (mediaItemId, originalUserId, sharedWithUserId) => {
+    const timestamp = Date.now();
+    const extension = '.jpg'; // Default to jpg, could be determined from mime type
+    
+    return `shared-photos/${originalUserId}/${sharedWithUserId}/${timestamp}-${mediaItemId}${extension}`;
+};
 
 /**
  * @route GET /api/photos
