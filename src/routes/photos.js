@@ -2,6 +2,7 @@ const express = require('express');
 const { verifyJWT } = require('./auth');
 const photosDb = require('../../db/photos');
 const { uploadPhotoToS3 } = require('../services/photoUploadService');
+const Controls = require('../controls');
 
 const router = express.Router();
 
@@ -30,7 +31,9 @@ router.post('/upload-shared', async (req, res) => {
             });
         }
         
-        console.log(`[Photos] Uploading ${mediaItemIds.length} photos to S3 for sharing with user ${sharedWithUserId}`);
+        if (Controls.enableDebugLogPhotoUpload) {
+            console.log(`[Photos] Uploading ${mediaItemIds.length} photos to S3 for sharing with user ${sharedWithUserId}`);
+        }
         
         const results = [];
         const errors = [];
@@ -76,7 +79,9 @@ router.post('/upload-shared', async (req, res) => {
                         s3Url: uploadResult.s3Url
                     });
                     
-                    console.log(`[Photos] Successfully uploaded photo ${mediaItemId} to S3`);
+                    if (Controls.enableDebugLogPhotoUpload) {
+                        console.log(`[Photos] Successfully uploaded photo ${mediaItemId} to S3`);
+                    }
                 } else {
                     errors.push({
                         mediaItemId,
@@ -85,7 +90,9 @@ router.post('/upload-shared', async (req, res) => {
                 }
                 
             } catch (error) {
-                console.error(`[Photos] Error processing photo ${mediaItemId}:`, error);
+                if (Controls.enableDebugLogPhotoUpload) {
+                    console.error(`[Photos] Error processing photo ${mediaItemId}:`, error);
+                }
                 errors.push({
                     mediaItemId,
                     error: error.message

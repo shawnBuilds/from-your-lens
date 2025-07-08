@@ -1,5 +1,6 @@
 const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
 const path = require('path');
+const Controls = require('../controls');
 
 // Initialize S3 client
 const s3Client = new S3Client({
@@ -19,7 +20,9 @@ const s3Client = new S3Client({
  */
 const uploadPhotoToS3 = async (photo, originalUserId, sharedWithUserId) => {
     try {
-        console.log(`[PhotoUploadService] Starting S3 upload for photo ${photo.media_item_id}`);
+        if (Controls.enableDebugLogPhotoUpload) {
+            console.log(`[PhotoUploadService] Starting S3 upload for photo ${photo.media_item_id}`);
+        }
         
         // Generate S3 key
         const s3Key = generateS3Key(photo.media_item_id, originalUserId, sharedWithUserId);
@@ -56,7 +59,9 @@ const uploadPhotoToS3 = async (photo, originalUserId, sharedWithUserId) => {
         // Generate S3 URL
         const s3Url = `https://${process.env.AWS_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${s3Key}`;
         
-        console.log(`[PhotoUploadService] Successfully uploaded photo ${photo.media_item_id} to S3: ${s3Key}`);
+        if (Controls.enableDebugLogPhotoUpload) {
+            console.log(`[PhotoUploadService] Successfully uploaded photo ${photo.media_item_id} to S3: ${s3Key}`);
+        }
         
         return {
             success: true,
@@ -66,7 +71,9 @@ const uploadPhotoToS3 = async (photo, originalUserId, sharedWithUserId) => {
         };
         
     } catch (error) {
-        console.error(`[PhotoUploadService] Error uploading photo ${photo.media_item_id} to S3:`, error);
+        if (Controls.enableDebugLogPhotoUpload) {
+            console.error(`[PhotoUploadService] Error uploading photo ${photo.media_item_id} to S3:`, error);
+        }
         return {
             success: false,
             error: error.message
@@ -99,7 +106,9 @@ const fetchImageData = async (imageUrl) => {
         if (imageUrl.startsWith('icloud://')) {
             // For iCloud URLs, we need to handle this differently
             // This would require the iOS client to provide the actual image data
-            console.warn('[PhotoUploadService] iCloud URL detected, image data should be provided by client');
+            if (Controls.enableDebugLogPhotoUpload) {
+                console.warn('[PhotoUploadService] iCloud URL detected, image data should be provided by client');
+            }
             return null;
         }
         
@@ -114,7 +123,9 @@ const fetchImageData = async (imageUrl) => {
         return Buffer.from(arrayBuffer);
         
     } catch (error) {
-        console.error(`[PhotoUploadService] Error fetching image data from ${imageUrl}:`, error);
+        if (Controls.enableDebugLogPhotoUpload) {
+            console.error(`[PhotoUploadService] Error fetching image data from ${imageUrl}:`, error);
+        }
         return null;
     }
 };
@@ -133,11 +144,15 @@ const deletePhotoFromS3 = async (s3Key) => {
             Key: s3Key
         }));
         
-        console.log(`[PhotoUploadService] Successfully deleted photo from S3: ${s3Key}`);
+        if (Controls.enableDebugLogPhotoUpload) {
+            console.log(`[PhotoUploadService] Successfully deleted photo from S3: ${s3Key}`);
+        }
         return true;
         
     } catch (error) {
-        console.error(`[PhotoUploadService] Error deleting photo from S3: ${s3Key}`, error);
+        if (Controls.enableDebugLogPhotoUpload) {
+            console.error(`[PhotoUploadService] Error deleting photo from S3: ${s3Key}`, error);
+        }
         return false;
     }
 };

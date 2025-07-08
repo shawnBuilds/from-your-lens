@@ -18,6 +18,7 @@ struct PhotoUploadResult {
         let success: Bool
         let s3Key: String?
         let s3Url: String?
+        let error: String?
     }
     
     struct PhotoUploadError {
@@ -117,7 +118,8 @@ class PhotoUploadService: PhotoUploadServiceProtocol {
                 mediaItemId: mediaItemId,
                 success: false,
                 s3Key: nil,
-                s3Url: nil
+                s3Url: nil,
+                error: "Photo not found in iCloud"
             )
         }
         
@@ -127,7 +129,8 @@ class PhotoUploadService: PhotoUploadServiceProtocol {
                 mediaItemId: mediaItemId,
                 success: false,
                 s3Key: nil,
-                s3Url: nil
+                s3Url: nil,
+                error: "Failed to get image data"
             )
         }
         
@@ -219,7 +222,7 @@ class PhotoUploadService: PhotoUploadServiceProtocol {
         
         // For now, we'll use a simplified approach where we send the mediaItemIds
         // and let the server handle the image data fetching
-        let requestBody = [
+        let requestBody: [String: Any] = [
             "mediaItemIds": [mediaItemId],
             "sharedWithUserId": sharedWithUserId
         ]
@@ -240,7 +243,8 @@ class PhotoUploadService: PhotoUploadServiceProtocol {
                     mediaItemId: mediaItemId,
                     success: result.success,
                     s3Key: result.s3Key,
-                    s3Url: result.s3Url
+                    s3Url: result.s3Url,
+                    error: nil
                 )
             } else {
                 throw PhotoUploadServiceError.noResultInResponse

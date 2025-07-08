@@ -97,7 +97,10 @@ class PhotosService: PhotosServiceProtocol {
             height: mockPhoto.height,
             creationTime: mockPhoto.creationTime,
             createdAt: mockPhoto.createdAt,
-            updatedAt: Date()
+            updatedAt: Date(),
+            s3Key: mockPhoto.s3Key,
+            s3Url: mockPhoto.s3Url,
+            sharedAt: mockPhoto.sharedAt
         )
         
         return updatedPhoto
