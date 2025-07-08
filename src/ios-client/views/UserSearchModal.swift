@@ -4,22 +4,49 @@ struct UserSearchModal: View {
     @EnvironmentObject var appState: AppState
     @Binding var isPresented: Bool
     @State private var searchText = ""
+    @State private var debouncedSearchText = ""
+    @State private var filteredUsers: [User] = []
     
-    var filteredUsers: [User] {
-        // First filter out the current user
-        let usersExcludingCurrent = appState.allUsers.filter { user in
-            user.id != appState.currentUser?.id
-        }
+    // Debounced search text to avoid excessive filtering
+    private func updateSearchText(_ newText: String) {
+        searchText = newText
         
-        // Only show users if there's a search term
-        if searchText.isEmpty {
-            return []
-        } else {
-            return usersExcludingCurrent.filter { user in
-                let fullName = user.fullName?.lowercased() ?? ""
-                let email = user.email.lowercased()
-                let searchLower = searchText.lowercased()
-                return fullName.contains(searchLower) || email.contains(searchLower)
+        // Debounce the search to avoid excessive filtering
+        Task {
+            try? await Task.sleep(nanoseconds: 150_000_000) // 150ms delay (reduced from 300ms)
+            await MainActor.run {
+                if searchText == newText { // Only update if text hasn't changed
+                    debouncedSearchText = newText
+                    updateFilteredUsers()
+                }
+            }
+        }
+    }
+    
+    private func updateFilteredUsers() {
+        // Run filtering off the main thread to prevent UI blocking
+        Task {
+            // First filter out the current user
+            let usersExcludingCurrent = appState.allUsers.filter { user in
+                user.id != appState.currentUser?.id
+            }
+            
+            // Only show users if there's a search term
+            let newFilteredUsers: [User]
+            if debouncedSearchText.isEmpty {
+                newFilteredUsers = []
+            } else {
+                newFilteredUsers = usersExcludingCurrent.filter { user in
+                    let fullName = user.fullName?.lowercased() ?? ""
+                    let email = user.email.lowercased()
+                    let searchLower = debouncedSearchText.lowercased()
+                    return fullName.contains(searchLower) || email.contains(searchLower)
+                }
+            }
+            
+            // Update UI on main thread
+            await MainActor.run {
+                filteredUsers = newFilteredUsers
             }
         }
     }
@@ -62,6 +89,9 @@ struct UserSearchModal: View {
                     TextField("Search by name or email...", text: $searchText)
                         .textFieldStyle(PlainTextFieldStyle())
                         .foregroundColor(.textColorPrimary)
+                        .onChange(of: searchText) { newValue in
+                            updateSearchText(newValue)
+                        }
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
@@ -106,13 +136,13 @@ struct UserSearchModal: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if filteredUsers.isEmpty {
                     VStack(spacing: 16) {
-                        Image(systemName: searchText.isEmpty ? "magnifyingglass" : "person.3.fill")
+                        Image(systemName: debouncedSearchText.isEmpty ? "magnifyingglass" : "person.3.fill")
                             .font(.system(size: 48))
                             .foregroundColor(.textColorSecondary)
-                        Text(searchText.isEmpty ? "Search for a friend" : "No users match your search")
+                        Text(debouncedSearchText.isEmpty ? "Search for a friend" : "No users match your search")
                             .font(.headline)
                             .foregroundColor(.textColorPrimary)
-                        Text(searchText.isEmpty ? "Type a name or email to find friends" : "Try a different search term")
+                        Text(debouncedSearchText.isEmpty ? "Type a name or email to find friends" : "Try a different search term")
                             .font(.caption)
                             .foregroundColor(.textColorSecondary)
                             .multilineTextAlignment(.center)
@@ -146,6 +176,9 @@ struct UserSearchModal: View {
                     await appState.fetchAllUsers()
                 }
             }
+            
+            // Initialize filtered users
+            updateFilteredUsers()
             
             if FeatureFlags.enableDebugBatchCompareModal {
                 print("[UserSearchModal] Total users: \(appState.allUsers.count)")
@@ -183,6 +216,8 @@ struct UserRowView: View {
                     }
                     .frame(width: 50, height: 50)
                     .clipShape(Circle())
+                    .id(profileUrl) // Force reload when URL changes
+                    .transition(.opacity) // Smooth transition
                 } else {
                     Image(systemName: "person.circle.fill")
                         .font(.system(size: 50))

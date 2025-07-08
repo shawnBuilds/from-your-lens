@@ -22,7 +22,7 @@ struct FeatureFlags {
     
     // MARK: - Face Detection Integration
     static let enableFaceDetectionUsage = true // Master switch for face detection functionality
-    static let enableDebugLogFaceDetection = false // Debug: log face detection operations
+    static let enableDebugLogFaceDetection = true // Debug: log face detection operations
     static let enableDebugBatchCompareModal = true // Debug: log batch compare modal operations
     static let faceDetectionSimilarityThreshold = 90.0 // Minimum similarity threshold for face matching
     static let maxImageSizeForFaceDetection = 5 * 1024 * 1024 // 5MB max image size for face detection

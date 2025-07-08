@@ -3,7 +3,7 @@ import UIKit
 
 // MARK: - Photo Upload Service Protocol
 protocol PhotoUploadServiceProtocol {
-    func uploadPhotosToS3(mediaItemIds: [String], sharedWithUserId: Int) async throws -> PhotoUploadResult
+    func uploadPhotosToS3(mediaItemIds: [String], photos: [Photo], sharedWithUserId: Int) async throws -> PhotoUploadResult
 }
 
 // MARK: - Photo Upload Result
@@ -40,7 +40,7 @@ class PhotoUploadService: PhotoUploadServiceProtocol {
     private let iCloudPhotoService = ICloudPhotoService()
     
     // MARK: - Photo Upload Service Protocol Implementation
-    func uploadPhotosToS3(mediaItemIds: [String], sharedWithUserId: Int) async throws -> PhotoUploadResult {
+    func uploadPhotosToS3(mediaItemIds: [String], photos: [Photo], sharedWithUserId: Int) async throws -> PhotoUploadResult {
         if FeatureFlags.enableDebugLogPhotoUpload {
             print("[PhotoUploadService] Starting S3 upload for \(mediaItemIds.count) photos to user \(sharedWithUserId)")
         }
@@ -57,6 +57,7 @@ class PhotoUploadService: PhotoUploadServiceProtocol {
             do {
                 let uploadResult = try await uploadSinglePhotoToS3(
                     mediaItemId: mediaItemId,
+                    photos: photos,
                     sharedWithUserId: sharedWithUserId,
                     authToken: authToken
                 )
@@ -108,12 +109,16 @@ class PhotoUploadService: PhotoUploadServiceProtocol {
     // MARK: - Private Methods
     private func uploadSinglePhotoToS3(
         mediaItemId: String,
+        photos: [Photo],
         sharedWithUserId: Int,
         authToken: String
     ) async throws -> PhotoUploadResult.PhotoUploadItemResult {
         
         // First, get the photo data from iCloud
-        guard let photo = await getPhotoFromICloud(mediaItemId: mediaItemId) else {
+        guard let photo = getPhotoFromICloud(mediaItemId: mediaItemId, photos: photos) else {
+            if FeatureFlags.enableDebugLogPhotoUpload {
+                print("[PhotoUploadService] Photo not found in local photos array: \(mediaItemId)")
+            }
             return PhotoUploadResult.PhotoUploadItemResult(
                 mediaItemId: mediaItemId,
                 success: false,
@@ -143,10 +148,21 @@ class PhotoUploadService: PhotoUploadServiceProtocol {
         )
     }
     
-    private func getPhotoFromICloud(mediaItemId: String) async -> Photo? {
-        // This would need to be implemented to get the photo from the local photos array
-        // For now, we'll return nil and handle this in the calling code
-        return nil
+    private func getPhotoFromICloud(mediaItemId: String, photos: [Photo]) -> Photo? {
+        // Find the photo in the local photos array by mediaItemId
+        let foundPhoto = photos.first { $0.mediaItemId == mediaItemId }
+        
+        if FeatureFlags.enableDebugLogPhotoUpload {
+            if let photo = foundPhoto {
+                print("[PhotoUploadService] Found photo in local array: \(mediaItemId)")
+                print("[PhotoUploadService] Photo baseUrl: \(photo.baseUrl)")
+            } else {
+                print("[PhotoUploadService] Photo not found in local array: \(mediaItemId)")
+                print("[PhotoUploadService] Available photos: \(photos.map { $0.mediaItemId })")
+            }
+        }
+        
+        return foundPhoto
     }
     
     private func getImageData(for photo: Photo) async -> Data? {
@@ -220,14 +236,24 @@ class PhotoUploadService: PhotoUploadServiceProtocol {
         request.setValue("Bearer \(authToken)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         
-        // For now, we'll use a simplified approach where we send the mediaItemIds
-        // and let the server handle the image data fetching
+        // Create request body with image data
         let requestBody: [String: Any] = [
             "mediaItemIds": [mediaItemId],
+            "photos": [
+                [
+                    "imageData": imageData.base64EncodedString(),
+                    "mimeType": "image/jpeg",
+                    "baseUrl": "icloud://\(mediaItemId)"
+                ]
+            ],
             "sharedWithUserId": sharedWithUserId
         ]
         
         request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
+        
+        if FeatureFlags.enableDebugLogPhotoUpload {
+            print("[PhotoUploadService] Sending upload request with image data size: \(imageData.count) bytes")
+        }
         
         let (data, response) = try await URLSession.shared.data(for: request)
         

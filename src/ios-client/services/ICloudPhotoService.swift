@@ -129,13 +129,66 @@ class ICloudPhotoService: ICloudPhotoServiceProtocol {
     
     // MARK: - Get Photo Asset
     func getPhotoAsset(for photo: Photo) async throws -> PHAsset? {
+        if FeatureFlags.enableDebugLogICloudPhotos {
+            print("[DEBUG][ICloudPhotoService] getPhotoAsset called for photo: \(photo.mediaItemId)")
+            print("[DEBUG][ICloudPhotoService] Photo baseUrl: \(photo.baseUrl)")
+            print("[DEBUG][ICloudPhotoService] Photo ID: \(photo.id)")
+        }
+        
         guard await requestPhotoLibraryAccess() else {
+            if FeatureFlags.enableDebugLogICloudPhotos {
+                print("[DEBUG][ICloudPhotoService] ❌ Photo library access denied - this could cause photo loading failures")
+            }
             throw ICloudPhotoServiceError.accessDenied
+        }
+        
+        if FeatureFlags.enableDebugLogICloudPhotos {
+            print("[DEBUG][ICloudPhotoService] ✅ Photo library access granted")
         }
         
         // Try to find the asset by local identifier
         if let asset = PHAsset.fetchAssets(withLocalIdentifiers: [photo.mediaItemId], options: nil).firstObject {
+            if FeatureFlags.enableDebugLogICloudPhotos {
+                print("[DEBUG][ICloudPhotoService] ✅ Found PHAsset for mediaItemId: \(photo.mediaItemId)")
+                print("[DEBUG][ICloudPhotoService] Asset localIdentifier: \(asset.localIdentifier)")
+                print("[DEBUG][ICloudPhotoService] Asset creationDate: \(asset.creationDate?.description ?? "nil")")
+                print("[DEBUG][ICloudPhotoService] Asset pixelWidth: \(asset.pixelWidth), pixelHeight: \(asset.pixelHeight)")
+                
+                // Check if we're using the same mediaItemId that was originally fetched
+                if asset.localIdentifier == photo.mediaItemId {
+                    print("[DEBUG][ICloudPhotoService] ✅ Using same mediaItemId that was originally fetched")
+                } else {
+                    print("[DEBUG][ICloudPhotoService] ❌ WARNING: mediaItemId mismatch! Expected: \(photo.mediaItemId), Found: \(asset.localIdentifier)")
+                }
+            }
             return asset
+        } else {
+            if FeatureFlags.enableDebugLogICloudPhotos {
+                print("[DEBUG][ICloudPhotoService] ❌ Could not find PHAsset for mediaItemId: \(photo.mediaItemId)")
+                print("[DEBUG][ICloudPhotoService] This could indicate:")
+                print("  - Photo was deleted from library")
+                print("  - Photo permissions were revoked")
+                print("  - Using mock/test data")
+                print("  - Running on different device/account")
+                print("  - Photo library sync issues")
+                
+                // Check if this looks like mock data
+                if photo.mediaItemId.contains("mock") || photo.mediaItemId.contains("test") {
+                    print("[DEBUG][ICloudPhotoService] ❌ WARNING: This appears to be mock/test data!")
+                }
+                
+                // Check if we're on the same device/account by looking at current photo library
+                let fetchOptions = PHFetchOptions()
+                fetchOptions.fetchLimit = 1
+                let recentAssets = PHAsset.fetchAssets(with: .image, options: fetchOptions)
+                if recentAssets.count > 0 {
+                    let recentAsset = recentAssets.firstObject!
+                    print("[DEBUG][ICloudPhotoService] Current device has photos available")
+                    print("[DEBUG][ICloudPhotoService] Sample recent asset ID: \(recentAsset.localIdentifier)")
+                } else {
+                    print("[DEBUG][ICloudPhotoService] ❌ No photos found in current photo library")
+                }
+            }
         }
         
         return nil
@@ -172,7 +225,10 @@ class ICloudPhotoService: ICloudPhotoServiceProtocol {
             height: Int(size.height),
             creationTime: creationDate,
             createdAt: Date(),
-            updatedAt: Date()
+            updatedAt: Date(),
+            s3Key: nil, // Not uploaded to S3 yet
+            s3Url: nil, // Not uploaded to S3 yet
+            sharedAt: nil // Not shared yet
         )
     }
     

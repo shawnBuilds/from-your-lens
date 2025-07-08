@@ -40,15 +40,7 @@ router.post('/upload-shared', async (req, res) => {
         
         if (Controls.enableDebugLogPhotoUpload) {
             console.log(`[Photos] Uploading ${mediaItemIds.length} photos to S3 for sharing with user ${sharedWithUserId}`);
-            console.log(`[Photos] Received photos data:`, photos.map(p => ({ 
-                hasImageData: !!p.imageData, 
-                imageDataLength: p.imageData ? p.imageData.length : 0,
-                mimeType: p.mimeType,
-                baseUrl: p.baseUrl
-            })));
         }
-        
-        console.log(`[Photos] Starting processing loop for ${mediaItemIds.length} photos`);
         
         const results = [];
         const errors = [];
@@ -58,11 +50,8 @@ router.post('/upload-shared', async (req, res) => {
             const mediaItemId = mediaItemIds[i];
             const photoData = photos[i];
             
-            console.log(`[Photos] Processing photo ${i + 1}/${mediaItemIds.length}: ${mediaItemId}`);
-            
             try {
                 if (!photoData || !photoData.imageData) {
-                    console.log(`[Photos] Photo ${mediaItemId} missing image data`);
                     errors.push({
                         mediaItemId,
                         error: 'Photo image data is missing'
@@ -70,14 +59,11 @@ router.post('/upload-shared', async (req, res) => {
                     continue;
                 }
                 
-                console.log(`[Photos] Converting base64 image data for ${mediaItemId}`);
                 // Convert base64 image data to buffer
                 const imageBuffer = Buffer.from(photoData.imageData, 'base64');
-                console.log(`[Photos] Image buffer created, size: ${imageBuffer.length} bytes`);
                 
                 // Generate S3 key
                 const s3Key = generateS3Key(mediaItemId, req.user.id, sharedWithUserId);
-                console.log(`[Photos] Generated S3 key: ${s3Key}`);
                 
                 // Determine content type
                 const contentType = photoData.mimeType || 'image/jpeg';
@@ -96,7 +82,6 @@ router.post('/upload-shared', async (req, res) => {
                     }
                 };
                 
-                console.log(`[Photos] Creating S3 client for ${mediaItemId}`);
                 const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
                 const s3Client = new S3Client({
                     region: process.env.AWS_REGION,
@@ -106,20 +91,18 @@ router.post('/upload-shared', async (req, res) => {
                     }
                 });
                 
-                console.log(`[Photos] Uploading to S3 for ${mediaItemId}...`);
                 await s3Client.send(new PutObjectCommand(uploadParams));
-                console.log(`[Photos] S3 upload completed for ${mediaItemId}`);
                 
                 // Generate S3 URL
                 const s3Url = `https://${process.env.AWS_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${s3Key}`;
                 
-                console.log(`[Photos] Updating database for ${mediaItemId}`);
                 // Update database with S3 info if photo exists
                 try {
                     await photosDb.updatePhotoS3Info(mediaItemId, s3Key, s3Url);
-                    console.log(`[Photos] Database updated for ${mediaItemId}`);
                 } catch (dbError) {
-                    console.log(`[Photos] Photo ${mediaItemId} not in database, skipping DB update: ${dbError.message}`);
+                    if (Controls.enableDebugLogPhotoUpload) {
+                        console.log(`[Photos] Photo ${mediaItemId} not in database, skipping DB update`);
+                    }
                 }
                 
                 results.push({
@@ -128,15 +111,15 @@ router.post('/upload-shared', async (req, res) => {
                     s3Key,
                     s3Url
                 });
-                console.log(`[Photos] Added ${mediaItemId} to results array`);
                 
                 if (Controls.enableDebugLogPhotoUpload) {
                     console.log(`[Photos] Successfully uploaded photo ${mediaItemId} to S3`);
                 }
                 
             } catch (error) {
-                console.error(`[Photos] Error processing photo ${mediaItemId}:`, error);
-                console.error(`[Photos] Error stack:`, error.stack);
+                if (Controls.enableDebugLogPhotoUpload) {
+                    console.error(`[Photos] Error processing photo ${mediaItemId}:`, error);
+                }
                 errors.push({
                     mediaItemId,
                     error: error.message
@@ -144,7 +127,6 @@ router.post('/upload-shared', async (req, res) => {
             }
         }
         
-        console.log(`[Photos] Processing complete. Sending response: ${results.length} successful, ${errors.length} failed`);
         res.json({
             success: true,
             results,

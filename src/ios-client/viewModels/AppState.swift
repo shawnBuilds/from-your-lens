@@ -215,10 +215,24 @@ class AppState: ObservableObject {
         isFetchingPhotos = true
         fetchPhotosError = nil
         
+        if FeatureFlags.enableDebugLogICloudPhotos {
+            print("[DEBUG][AppState] Starting to fetch photos for user: \(user.id)")
+        }
+        
         do {
             let result = try await photosService.fetchUserPhotos(userId: String(user.id))
             if FeatureFlags.enableDebugLogICloudPhotos {
                 print("[DEBUG][AppState] Fetched \(result.photos.count) photos from iCloud")
+                
+                // Log details of first few photos for debugging
+                let samplePhotos = Array(result.photos.prefix(3))
+                for (index, photo) in samplePhotos.enumerated() {
+                    print("[DEBUG][AppState] Sample photo \(index + 1):")
+                    print("  - ID: \(photo.id)")
+                    print("  - mediaItemId: \(photo.mediaItemId)")
+                    print("  - URL: \(photo.baseUrl)")
+                    print("  - Creation time: \(photo.creationTime?.description ?? "nil")")
+                }
             }
             photos = result.photos
             hasMorePhotos = result.hasMore
@@ -351,7 +365,12 @@ class AppState: ObservableObject {
                 matchesAttempted = index + 1
                 
                 if FeatureFlags.enableDebugLogFaceDetection {
-                    print("[AppState] Comparing target \(index + 1)/\(targetPhotos.count): \(targetPhoto.mediaItemId)")
+                    print("[AppState] 🔍 Comparing target \(index + 1)/\(targetPhotos.count): \(targetPhoto.mediaItemId)")
+                    print("[AppState] Target photo details:")
+                    print("  - ID: \(targetPhoto.id)")
+                    print("  - URL: \(targetPhoto.baseUrl)")
+                    print("  - User ID: \(targetPhoto.userId)")
+                    print("  - Creation time: \(targetPhoto.creationTime?.description ?? "nil")")
                 }
                 
                 do {
@@ -513,6 +532,17 @@ class AppState: ObservableObject {
         if batchCompareMode == .sendPhotos {
             if FeatureFlags.enableDebugBatchCompareModal {
                 print("[AppState] Auto-presenting batch compare modal for send photos mode")
+                print("[AppState] Current user photos available: \(photos.count)")
+                print("[AppState] Target user: \(user.displayName) (ID: \(user.id))")
+                
+                // Log sample of available photos for debugging
+                let samplePhotos = Array(photos.prefix(3))
+                for (index, photo) in samplePhotos.enumerated() {
+                    print("[AppState] Sample photo \(index + 1) for batch compare:")
+                    print("  - ID: \(photo.id)")
+                    print("  - mediaItemId: \(photo.mediaItemId)")
+                    print("  - URL: \(photo.baseUrl)")
+                }
             }
             isBatchCompareModalPresented = true
         }
@@ -587,6 +617,7 @@ class AppState: ObservableObject {
     private func uploadMatchedPhotosToS3(matchingResults: [BatchCompareResult], sharedWithUserId: Int) async {
         let photoUploadService = PhotoUploadService()
         let mediaItemIds = matchingResults.map { $0.photo.mediaItemId }
+        let photosToUpload = matchingResults.map { $0.photo }
         
         if FeatureFlags.enableDebugLogPhotoUpload {
             print("[AppState] Starting S3 upload for \(mediaItemIds.count) matched photos to user \(sharedWithUserId)")
@@ -595,6 +626,7 @@ class AppState: ObservableObject {
         do {
             let uploadResult = try await photoUploadService.uploadPhotosToS3(
                 mediaItemIds: mediaItemIds,
+                photos: photosToUpload,
                 sharedWithUserId: sharedWithUserId
             )
             
@@ -658,14 +690,77 @@ class AppState: ObservableObject {
     }
     
     private func convertPhotoToImageData(_ photo: Photo) async -> Data? {
-        // For now, we'll use a placeholder implementation
-        // In a real implementation, this would fetch the actual image data from the photo URL
+        if FeatureFlags.enableDebugLogFaceDetection {
+            print("[AppState] Converting photo to image data: \(photo.mediaItemId)")
+            print("[AppState] Photo URL: \(photo.baseUrl)")
+            print("[AppState] Photo ID: \(photo.id)")
+            print("[AppState] Photo userId: \(photo.userId)")
+        }
+        
+        // Handle iCloud photos
+        if photo.baseUrl.hasPrefix("icloud://") {
+            if FeatureFlags.enableDebugLogFaceDetection {
+                print("[AppState] Processing iCloud photo: \(photo.mediaItemId)")
+                print("[AppState] Extracted mediaItemId from URL: \(photo.mediaItemId)")
+            }
+            
+            do {
+                let iCloudService = ICloudPhotoService()
+                guard let asset = try await iCloudService.getPhotoAsset(for: photo) else {
+                    if FeatureFlags.enableDebugLogFaceDetection {
+                        print("[AppState] ❌ Could not find iCloud asset for photo: \(photo.mediaItemId)")
+                        print("[AppState] This will cause face matching to fail")
+                    }
+                    return nil
+                }
+                
+                if FeatureFlags.enableDebugLogFaceDetection {
+                    print("[AppState] ✅ Found iCloud asset, loading image data...")
+                }
+                
+                let targetSize = CGSize(width: 1920, height: 1920) // High quality for face detection
+                guard let image = try await iCloudService.loadImageFromAsset(asset, targetSize: targetSize) else {
+                    if FeatureFlags.enableDebugLogFaceDetection {
+                        print("[AppState] ❌ Could not load image from iCloud asset: \(photo.mediaItemId)")
+                    }
+                    return nil
+                }
+                
+                // Convert UIImage to Data
+                guard let imageData = image.jpegData(compressionQuality: 0.9) else {
+                    if FeatureFlags.enableDebugLogFaceDetection {
+                        print("[AppState] ❌ Could not convert UIImage to Data for: \(photo.mediaItemId)")
+                    }
+                    return nil
+                }
+                
+                if FeatureFlags.enableDebugLogFaceDetection {
+                    print("[AppState] ✅ Successfully loaded iCloud image data: \(photo.mediaItemId), size: \(imageData.count) bytes")
+                }
+                
+                return imageData
+                
+            } catch {
+                if FeatureFlags.enableDebugLogFaceDetection {
+                    print("[AppState] ❌ Error loading iCloud image data for \(photo.mediaItemId): \(error)")
+                }
+                return nil
+            }
+        }
+        
+        // Handle regular HTTP URLs
         guard let url = URL(string: photo.baseUrl) else {
+            if FeatureFlags.enableDebugLogFaceDetection {
+                print("[AppState] Invalid URL: \(photo.baseUrl)")
+            }
             return nil
         }
         
         do {
             let (data, _) = try await URLSession.shared.data(from: url)
+            if FeatureFlags.enableDebugLogFaceDetection {
+                print("[AppState] Successfully loaded HTTP image data: \(photo.mediaItemId), size: \(data.count) bytes")
+            }
             return data
         } catch {
             if FeatureFlags.enableDebugLogFaceDetection {
