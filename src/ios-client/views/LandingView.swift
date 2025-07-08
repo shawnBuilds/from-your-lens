@@ -9,8 +9,8 @@ struct LandingView: View {
     @State private var authErrorMessage = ""
     
     let galleryImages: [GalleryImage] = [
-        GalleryImage(id: "gallery-2", url: "https://play.rosebud.ai/assets/jules-02.jpg?8JqA", alt: "Group fun photo", friendPfp: "https://play.rosebud.ai/assets/friend-2-v2.png?itRQ", userPfp: "https://rosebud.ai/assets/jules-pfp.jpg?zlHT"),
-        GalleryImage(id: "gallery-3", url: "https://play.rosebud.ai/assets/jules-3-v3.jpg.png?6xGJ", alt: "Travel moment photo", friendPfp: "https://play.rosebud.ai/assets/friend-3-pfp-v2.png?RfB4", userPfp: "https://rosebud.ai/assets/jules-pfp.jpg?zlHT")
+        GalleryImage(id: "gallery-3", url: "https://play.rosebud.ai/assets/jules-3-v3.jpg.png?6xGJ", alt: "Travel moment photo", friendPfp: "https://play.rosebud.ai/assets/friend-3-pfp-v2.png?RfB4", userPfp: "https://rosebud.ai/assets/jules-pfp.jpg?zlHT"),
+        GalleryImage(id: "gallery-2", url: "https://play.rosebud.ai/assets/jules-02.jpg?8JqA", alt: "Group fun photo", friendPfp: "https://play.rosebud.ai/assets/friend-2-v2.png?itRQ", userPfp: "https://rosebud.ai/assets/jules-pfp.jpg?zlHT")
     ]
     let howItWorksSteps: [HowItWorksStep] = [
         HowItWorksStep(iconUrl: "https://play.rosebud.ai/assets/icon-invite.png?4HL1", text: "Invite a ", bold: "friend"),
@@ -111,8 +111,8 @@ struct LandingView: View {
                             .shadow(color: .neumorphicShadow.opacity(0.5), radius: 8, x: 4, y: 4)
                                 }
                             } else {
-                                // Real Google Sign-In Button
-                                GoogleSignInButton(action: {
+                                // Use the custom sign-in button
+                                CustomGoogleSignInButton(action: {
                                     isSigningIn = true
                                     Task {
                                         do {
@@ -123,19 +123,8 @@ struct LandingView: View {
                                         }
                                         isSigningIn = false
                                     }
-                                })
-                                .frame(height: 50)
-                                .cornerRadius(25)
-                                .disabled(isSigningIn)
-                                .overlay(
-                                    Group {
-                                        if isSigningIn {
-                                            ProgressView()
-                                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                                .scaleEffect(0.8)
-                                        }
-                                    }
-                                )
+                                }, isLoading: isSigningIn)
+                                .padding(.horizontal, 8)
                             }
                         }
                         .padding(.top, 16)
@@ -227,6 +216,7 @@ struct GalleryImage: Identifiable {
 struct GalleryCardView: View {
     let image: GalleryImage
     @State private var appear = false
+    @Environment(\.colorScheme) var colorScheme
     var body: some View {
         ZStack {
             AsyncImage(url: URL(string: image.url)) { phase in
@@ -285,18 +275,19 @@ struct GalleryCardView: View {
                 }
             }
             .padding(8)
-            // Overlay transfer arrow
-            VStack {
-                HStack {
-                    Image(systemName: "arrow.right") // Replace with custom asset if available
-                        .resizable()
-                        .frame(width: 18, height: 18) // Reduced size
-                        .foregroundColor(.white.opacity(0.8))
-                        .rotationEffect(.degrees(45))
-                        .offset(x: 16, y: -16)
-                    Spacer()
+            // Overlay transfer arrow (show for all cards, middle right, flipped vertically)
+            GeometryReader { geo in
+                AsyncImage(url: URL(string: IconURLs.whiteArrow)) { phase in
+                    switch phase {
+                    case .success(let img):
+                        img.resizable()
+                            .frame(width: 90, height: 60)
+                            .scaleEffect(x: 1, y: -2) // Flip vertically and double height
+                            .position(x: geo.size.width - 30, y: geo.size.height / 2 - 30) // Move higher
+                    default:
+                        EmptyView()
+                    }
                 }
-                Spacer()
             }
         }
         .frame(height: 152)

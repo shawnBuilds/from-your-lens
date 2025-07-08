@@ -2,6 +2,23 @@ import Foundation
 import Photos
 import UIKit
 
+// MARK: - Thread-safe Photo ID Generator
+actor PhotoIDGenerator {
+    private var counter = 0
+    
+    func nextID() -> Int {
+        counter += 1
+        return counter
+    }
+    
+    func reset() {
+        counter = 0
+        if FeatureFlags.enableDebugLogICloudPhotos {
+            print("[DEBUG][ICloudPhotoService] Photo counter reset to 0")
+        }
+    }
+}
+
 // MARK: - iCloud Photo Service Protocol
 protocol ICloudPhotoServiceProtocol {
     func requestPhotoLibraryAccess() async -> Bool
@@ -15,8 +32,7 @@ class ICloudPhotoService: ICloudPhotoServiceProtocol {
     
     // MARK: - Properties
     private let imageManager = PHImageManager.default()
-    private static var globalPhotoCounter = 0
-    private static let photoCounterLock = NSLock()
+    private let photoIDGenerator = PhotoIDGenerator()
     
     // MARK: - Photo Library Access
     func requestPhotoLibraryAccess() async -> Bool {
@@ -47,32 +63,33 @@ class ICloudPhotoService: ICloudPhotoServiceProtocol {
         
         let fetchResult = PHAsset.fetchAssets(with: .image, options: fetchOptions)
         
-        var photos: [Photo] = []
-        let group = DispatchGroup()
-        let queue = DispatchQueue(label: "com.fromyourlens.icloudphotos", attributes: .concurrent)
-        
         let actualCount = min(fetchResult.count, count)
         
-        for i in 0..<actualCount {
-            group.enter()
-            let asset = fetchResult.object(at: i)
-            
-            queue.async {
-                Task {
+        // Use TaskGroup for concurrent photo processing
+        var photos: [Photo] = []
+        
+        await withTaskGroup(of: Photo?.self) { group in
+            for i in 0..<actualCount {
+                let asset = fetchResult.object(at: i)
+                group.addTask {
                     do {
-                        let photo = try await self.createPhotoFromAsset(asset, userId: 9999)
-                        photos.append(photo)
+                        return try await self.createPhotoFromAsset(asset, userId: 9999)
                     } catch {
                         if FeatureFlags.enableDebugLogICloudPhotos {
                             print("[DEBUG][ICloudPhotoService] Error creating photo from asset \(i+1): \(error)")
                         }
+                        return nil // Return nil for failed photos instead of throwing
                     }
-                    group.leave()
+                }
+            }
+            
+            // Collect results as they complete
+            for await photo in group {
+                if let photo = photo {
+                    photos.append(photo)
                 }
             }
         }
-        
-        group.wait()
         
         // Sort by creation date (newest first)
         photos.sort { ($0.creationTime ?? Date.distantPast) > ($1.creationTime ?? Date.distantPast) }
@@ -126,11 +143,8 @@ class ICloudPhotoService: ICloudPhotoServiceProtocol {
     
     // MARK: - Helper Methods
     private func createPhotoFromAsset(_ asset: PHAsset, userId: Int) async throws -> Photo {
-        // Use thread-safe counter to ensure unique IDs
-        ICloudPhotoService.photoCounterLock.lock()
-        ICloudPhotoService.globalPhotoCounter += 1
-        let uniqueId = ICloudPhotoService.globalPhotoCounter
-        ICloudPhotoService.photoCounterLock.unlock()
+        // Use actor for thread-safe ID generation
+        let uniqueId = await photoIDGenerator.nextID()
         
         let creationDate = asset.creationDate ?? Date()
         let mediaItemId = asset.localIdentifier
@@ -163,13 +177,8 @@ class ICloudPhotoService: ICloudPhotoServiceProtocol {
     }
     
     // MARK: - Static Methods
-    static func resetPhotoCounter() {
-        photoCounterLock.lock()
-        globalPhotoCounter = 0
-        photoCounterLock.unlock()
-        if FeatureFlags.enableDebugLogICloudPhotos {
-            print("[DEBUG][ICloudPhotoService] Photo counter reset to 0")
-        }
+    func resetPhotoCounter() async {
+        await photoIDGenerator.reset()
     }
     
     // MARK: - Image Loading (for future use)
@@ -204,11 +213,11 @@ enum ICloudPhotoServiceError: Error, LocalizedError {
         case .accessDenied:
             return "Photo library access denied"
         case .noPhotosFound:
-            return "No photos found in iCloud"
+            return "No photos found in library"
         case .assetNotFound:
             return "Photo asset not found"
         case .imageLoadFailed:
-            return "Failed to load image from iCloud"
+            return "Failed to load image"
         }
     }
 } 

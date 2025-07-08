@@ -48,6 +48,15 @@ router.post('/profile-picture', upload.single('profilePicture'), async (req, res
 
         const s3Url = getS3Url(req.file.key);
 
+        if (Controls.enableDebugLogUser) {
+            console.log('[Profile Picture] Updating user profile picture URL:', {
+                userId: req.user.id,
+                userEmail: req.user.email,
+                newUrl: s3Url,
+                timestamp: new Date().toISOString()
+            });
+        }
+        
         // Update user's profile picture URL in database
         const query = `
             UPDATE users 
@@ -57,6 +66,14 @@ router.post('/profile-picture', upload.single('profilePicture'), async (req, res
         `;
         
         const result = await pool.query(query, [s3Url, req.user.id]);
+        
+        if (Controls.enableDebugLogUser) {
+            console.log('[Profile Picture] Database update result:', {
+                userId: result.rows[0]?.id,
+                updatedProfilePictureUrl: result.rows[0]?.profile_picture_url,
+                success: !!result.rows[0]
+            });
+        }
         
         const response = {
             message: 'Profile picture uploaded successfully',

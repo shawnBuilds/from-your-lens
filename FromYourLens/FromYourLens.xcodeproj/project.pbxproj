@@ -37,6 +37,7 @@
 		295105492E16E59400F5ACD5 /* SwiftyCrop in Frameworks */ = {isa = PBXBuildFile; productRef = 295105482E16E59400F5ACD5 /* SwiftyCrop */; };
 		295AEC162E0DC24900D87103 /* ICloudPhotoService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 295AEC152E0DC24800D87103 /* ICloudPhotoService.swift */; };
 		2965D7532E182A84005F2900 /* UserSearchModal.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2965D7522E182A84005F2900 /* UserSearchModal.swift */; };
+		2965D7552E1C3B09005F2900 /* CustomGoogleSignInButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2965D7542E1C3B09005F2900 /* CustomGoogleSignInButton.swift */; };
 		297180022E14384C00366BF4 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = 297180012E14384C00366BF4 /* GoogleSignIn */; };
 		297180042E14384C00366BF4 /* GoogleSignInSwift in Frameworks */ = {isa = PBXBuildFile; productRef = 297180032E14384C00366BF4 /* GoogleSignInSwift */; };
 		297180072E143FB400366BF4 /* GoogleOAuthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 297180062E143FB300366BF4 /* GoogleOAuthService.swift */; };
@@ -98,6 +99,7 @@
 		295AEC152E0DC24800D87103 /* ICloudPhotoService.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ICloudPhotoService.swift; sourceTree = "<group>"; };
 		295AEC172E0DC5DE00D87103 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		2965D7522E182A84005F2900 /* UserSearchModal.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = UserSearchModal.swift; sourceTree = "<group>"; };
+		2965D7542E1C3B09005F2900 /* CustomGoogleSignInButton.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CustomGoogleSignInButton.swift; sourceTree = "<group>"; };
 		297180052E143D6B00366BF4 /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 		297180062E143FB300366BF4 /* GoogleOAuthService.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = GoogleOAuthService.swift; sourceTree = "<group>"; };
 		29AE9B702E0EEF6300B4CB91 /* FaceApiService.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = FaceApiService.swift; sourceTree = "<group>"; };
@@ -228,6 +230,7 @@
 		294C4C922E0AE968004CF461 /* views */ = {
 			isa = PBXGroup;
 			children = (
+				2965D7542E1C3B09005F2900 /* CustomGoogleSignInButton.swift */,
 				2965D7522E182A84005F2900 /* UserSearchModal.swift */,
 				295105452E16D1B900F5ACD5 /* ProfilePicturePickerModal.swift */,
 				29D1F6372E13109A00A68FE9 /* FaceMatchingProgressBar.swift */,
@@ -433,6 +436,7 @@
 				294C4D0D2E0AF913004CF461 /* Constants.swift in Sources */,
 				294C4D172E0B15BA004CF461 /* LoadingView.swift in Sources */,
 				295105462E16D1B900F5ACD5 /* ProfilePicturePickerModal.swift in Sources */,
+				2965D7552E1C3B09005F2900 /* CustomGoogleSignInButton.swift in Sources */,
 				294C4D262E0C705A004CF461 /* PhotoGalleryView.swift in Sources */,
 				29D1F6382E13109A00A68FE9 /* FaceMatchingProgressBar.swift in Sources */,
 				29AE9B712E0EEF6300B4CB91 /* FaceApiService.swift in Sources */,

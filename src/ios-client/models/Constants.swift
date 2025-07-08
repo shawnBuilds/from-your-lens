@@ -109,6 +109,7 @@ struct IconURLs {
     static let photosOfYou = "https://play.rosebud.ai/assets/icon-you-selfie.png?MQtz"
     static let findPhotos = "https://play.rosebud.ai/assets/icon-search.png?mQKb"
     static let sendPhotos = "https://play.rosebud.ai/assets/icon-send-no-bg.png?b4PE"
+    static let whiteArrow = "https://rosebud.ai/assets/arrow-white.png?EJbv" // Added new arrow asset
 }
 
 // MARK: - Service Protocols

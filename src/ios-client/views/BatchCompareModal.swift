@@ -23,7 +23,16 @@ struct BatchCompareModal: View {
     
     // Auto-populate source photo with profile picture when available
     private var autoPopulatedSourcePhoto: Photo? {
-        guard let user = appState.currentUser,
+        // Determine which user's profile picture to use based on mode
+        let targetUser: User?
+        switch appState.batchCompareMode {
+        case .findPhotos:
+            targetUser = appState.currentUser
+        case .sendPhotos:
+            targetUser = appState.selectedTargetUser
+        }
+        
+        guard let user = targetUser,
               let profileUrl = user.profilePictureUrl,
               !profileUrl.isEmpty else {
             return nil
@@ -31,7 +40,7 @@ struct BatchCompareModal: View {
         
         let profilePhoto = Photo.fromProfilePicture(url: profileUrl, userId: user.id)
         if FeatureFlags.enableDebugBatchCompareModal {
-            print("[BatchCompareModal] Auto-populated source photo with profile picture: \(profileUrl)")
+            print("[BatchCompareModal] Auto-populated source photo with profile picture for \(appState.batchCompareMode): \(profileUrl)")
         }
         return profilePhoto
     }
@@ -218,8 +227,17 @@ struct SourcePhotoSection: View {
                 }
             } else {
                 SourcePhotoPickerButton {
-                    // Check if user has a profile picture
-                    if let user = appState.currentUser,
+                    // Determine which user's profile picture to check based on mode
+                    let targetUser: User?
+                    switch appState.batchCompareMode {
+                    case .findPhotos:
+                        targetUser = appState.currentUser
+                    case .sendPhotos:
+                        targetUser = appState.selectedTargetUser
+                    }
+                    
+                    // Check if target user has a profile picture
+                    if let user = targetUser,
                        let profileUrl = user.profilePictureUrl,
                        !profileUrl.isEmpty {
                         // User has profile picture, show regular photo picker

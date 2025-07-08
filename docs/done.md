@@ -37,3 +37,6 @@ A daily log of completed tasks and milestones.
 - Implemented end-to-end user search for sending photos to other users
 - Automatically show users their friend's PFPs when sending photos to them
 - Fixed a bug where the matching image preview  always showed the first iCloud photo
+
+## 07/07
+- Users can now request to send a friend their photos with the friend in them

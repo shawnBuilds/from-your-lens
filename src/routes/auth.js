@@ -2,7 +2,7 @@ const express = require('express');
 const jwt = require('jsonwebtoken');
 const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
-const { getUserById, upsertUser } = require('../../db/users');
+const { getUserById, upsertUser, getUserByGoogleId } = require('../../db/users');
 const { transformUserToAPI } = require('../lib/databaseHelpers');
 const Controls = require('../controls');
 
@@ -213,16 +213,35 @@ router.post('/google/callback', async (req, res) => {
         
         const payload = ticket.getPayload();
         
-        // Create or update user in database
+        // Check if user already exists to preserve profile picture URL
+        let existingUser = null;
+        try {
+            existingUser = await getUserByGoogleId(payload.sub);
+            if (Controls.enableDebugLogOAuth) {
+                console.log('[GoogleOAuth] Found existing user:', {
+                    id: existingUser?.id,
+                    email: existingUser?.email,
+                    hasProfilePicture: !!existingUser?.profile_picture_url,
+                    profilePictureUrl: existingUser?.profile_picture_url
+                });
+            }
+        } catch (error) {
+            if (Controls.enableDebugLogOAuth) {
+                console.log('[GoogleOAuth] No existing user found or error fetching:', error.message);
+            }
+        }
+        
+        // Create or update user in database, preserving existing profile picture URL
         const userData = {
             googleId: payload.sub,
             email: payload.email,
             fullName: payload.name,
-            profilePictureUrl: null // Don't use Google profile picture - users need to upload selfie
+            profilePictureUrl: existingUser?.profile_picture_url || null // Preserve existing profile picture URL
         };
         
         if (Controls.enableDebugLogOAuth) {
             console.log('[GoogleOAuth] User data to upsert:', userData);
+            console.log('[GoogleOAuth] Preserving profile picture URL:', userData.profilePictureUrl);
         }
         const user = await upsertUser(userData);
         if (Controls.enableDebugLogOAuth) {
@@ -308,7 +327,8 @@ router.get('/verify-token', verifyJWT, async (req, res) => {
                 userId: user.id,
                 email: user.email,
                 hasProfilePicture: !!user.profile_picture_url,
-                profilePictureUrl: user.profile_picture_url
+                profilePictureUrl: user.profile_picture_url,
+                timestamp: new Date().toISOString()
             });
         }
 

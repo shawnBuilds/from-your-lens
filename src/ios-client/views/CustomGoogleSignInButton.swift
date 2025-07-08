@@ -13,26 +13,27 @@ struct CustomGoogleSignInButton: View {
                         .progressViewStyle(CircularProgressViewStyle(tint: .white))
                         .scaleEffect(0.8)
                 } else {
-                    Image("google_logo") // Add Google logo asset to your project
-                        .resizable()
-                        .frame(width: 20, height: 20)
-                        .foregroundColor(.white)
+                    AsyncImage(url: URL(string: "https://rosebud.ai/assets/google_icon.webp?phu5")) { phase in
+                        if let image = phase.image {
+                            image
+                                .resizable()
+                                .renderingMode(.template)
+                                .foregroundColor(Color.textColorPrimary)
+                                .frame(width: 30, height: 30)
+                        } else {
+                            Color.clear.frame(width: 30, height: 30)
+                        }
+                    }
                 }
                 
-                Text("Sign in with Google")
+                Text("Continue with Google")
                     .font(.headline)
                     .foregroundColor(.white)
             }
             .padding(.vertical, 16)
             .padding(.horizontal, 24)
             .frame(maxWidth: .infinity)
-            .background(
-                LinearGradient(
-                    gradient: Gradient(colors: [Color.blue, Color.blue.opacity(0.8)]),
-                    startPoint: .leading,
-                    endPoint: .trailing
-                )
-            )
+            .background(Color.primaryColor)
             .cornerRadius(25)
             .shadow(color: .black.opacity(0.2), radius: 4, x: 0, y: 2)
         }
