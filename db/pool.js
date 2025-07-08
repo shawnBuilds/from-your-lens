@@ -9,10 +9,27 @@ if (missingEnvVars.length > 0) {
     throw new Error(`Missing required environment variables: ${missingEnvVars.join(', ')}`);
 }
 
-const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-});
+// Parse DATABASE_URL and override SSL settings for local development
+let connectionConfig = {
+    connectionString: process.env.DATABASE_URL
+};
+
+// For local development, explicitly disable SSL
+if (process.env.NODE_ENV !== 'production') {
+    connectionConfig = {
+        ...connectionConfig,
+        ssl: false,
+        rejectUnauthorized: false
+    };
+} else {
+    // For production, use SSL with proper configuration
+    connectionConfig = {
+        ...connectionConfig,
+        ssl: { rejectUnauthorized: false }
+    };
+}
+
+const pool = new Pool(connectionConfig);
 
 // Test database connection
 pool.connect()

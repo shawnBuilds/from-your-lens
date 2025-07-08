@@ -14,6 +14,9 @@ struct Photo: Codable, Identifiable, Equatable {
     let creationTime: Date?
     let createdAt: Date
     let updatedAt: Date
+    let s3Key: String?
+    let s3Url: String?
+    let sharedAt: Date?
     
     enum CodingKeys: String, CodingKey {
         case id
@@ -29,6 +32,9 @@ struct Photo: Codable, Identifiable, Equatable {
         case creationTime = "creation_time"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
+        case s3Key = "s3_key"
+        case s3Url = "s3_url"
+        case sharedAt = "shared_at"
     }
     
     // MARK: - Computed Properties
@@ -73,7 +79,10 @@ extension Photo {
         height: 1080,
         creationTime: Date(),
         createdAt: Date(),
-        updatedAt: Date()
+        updatedAt: Date(),
+        s3Key: nil,
+        s3Url: nil,
+        sharedAt: nil
     )
     
     // MARK: - Profile Picture Helper
@@ -91,7 +100,10 @@ extension Photo {
             height: 400,
             creationTime: Date(),
             createdAt: Date(),
-            updatedAt: Date()
+            updatedAt: Date(),
+            s3Key: nil,
+            s3Url: nil,
+            sharedAt: nil
         )
     }
     
@@ -109,7 +121,10 @@ extension Photo {
             height: 1080,
             creationTime: Date().addingTimeInterval(-86400 * 1),
             createdAt: Date(),
-            updatedAt: Date()
+            updatedAt: Date(),
+            s3Key: nil,
+            s3Url: nil,
+            sharedAt: nil
         ),
         Photo(
             id: 2,
@@ -124,7 +139,10 @@ extension Photo {
             height: 1080,
             creationTime: Date().addingTimeInterval(-86400 * 2),
             createdAt: Date(),
-            updatedAt: Date()
+            updatedAt: Date(),
+            s3Key: nil,
+            s3Url: nil,
+            sharedAt: nil
         ),
         Photo(
             id: 3,
@@ -139,7 +157,10 @@ extension Photo {
             height: 1350,
             creationTime: Date().addingTimeInterval(-86400 * 3),
             createdAt: Date(),
-            updatedAt: Date()
+            updatedAt: Date(),
+            s3Key: nil,
+            s3Url: nil,
+            sharedAt: nil
         ),
         Photo(
             id: 4,
@@ -154,7 +175,10 @@ extension Photo {
             height: 1080,
             creationTime: Date().addingTimeInterval(-86400 * 4),
             createdAt: Date(),
-            updatedAt: Date()
+            updatedAt: Date(),
+            s3Key: nil,
+            s3Url: nil,
+            sharedAt: nil
         ),
         Photo(
             id: 5,
@@ -169,7 +193,10 @@ extension Photo {
             height: 1350,
             creationTime: Date().addingTimeInterval(-86400 * 5),
             createdAt: Date(),
-            updatedAt: Date()
+            updatedAt: Date(),
+            s3Key: nil,
+            s3Url: nil,
+            sharedAt: nil
         ),
         Photo(
             id: 6,
@@ -184,7 +211,10 @@ extension Photo {
             height: 400,
             creationTime: Date().addingTimeInterval(-86400 * 6),
             createdAt: Date(),
-            updatedAt: Date()
+            updatedAt: Date(),
+            s3Key: nil,
+            s3Url: nil,
+            sharedAt: nil
         )
         // Add more as needed to match the legacy MOCK_PHOTOS
     ]

@@ -800,7 +800,39 @@ struct BatchComparePhotoView: View {
     let size: CGFloat
     var body: some View {
         Group {
-            if photo.baseUrl.hasPrefix("icloud://") {
+            if let s3Url = photo.s3Url, !s3Url.isEmpty {
+                // Handle S3 photos (shared photos)
+                AsyncImage(url: URL(string: s3Url)) { phase in
+                    switch phase {
+                    case .empty:
+                        ProgressView()
+                            .frame(width: size, height: size)
+                            .background(Color(.systemGray6))
+                            .cornerRadius(8)
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: size, height: size)
+                            .clipped()
+                            .cornerRadius(8)
+                    case .failure:
+                        VStack {
+                            Image(systemName: "exclamationmark.triangle")
+                                .foregroundColor(.red)
+                                .font(.largeTitle)
+                            Text("Failed to load")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        .frame(width: size, height: size)
+                        .background(Color(.systemGray6))
+                        .cornerRadius(8)
+                    @unknown default:
+                        EmptyView()
+                    }
+                }
+            } else if photo.baseUrl.hasPrefix("icloud://") {
                 ICloudPhotoView(photo: photo, cellSize: size)
                     .id(photo.id) // Force state reset when photo changes
             } else {

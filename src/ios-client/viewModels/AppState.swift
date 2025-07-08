@@ -552,6 +552,7 @@ class AppState: ObservableObject {
             targetUserId = selectedUser.id
         }
         
+        // First, update photo metadata (photo_of field)
         for result in matchingResults {
             do {
                 let updatedPhoto = try await photosService.updatePhotoSubject(
@@ -566,11 +567,93 @@ class AppState: ObservableObject {
                 
             } catch {
                 failedUpdates += 1
+                if FeatureFlags.enableDebugLogPhotoUpload {
+                    print("[AppState] Failed to update photo metadata for \(result.photo.mediaItemId): \(error)")
+                }
             }
+        }
+        
+        // If this is send photos mode, upload photos to S3
+        if batchCompareMode == .sendPhotos && !matchingResults.isEmpty {
+            await uploadMatchedPhotosToS3(matchingResults: matchingResults, sharedWithUserId: targetUserId)
         }
         
         if FeatureFlags.enableDebugLogFaceDetection {
             print("[AppState] Confirmed \(successfulUpdates) matches for user ID: \(targetUserId)")
+        }
+    }
+    
+    // MARK: - Photo Upload Methods
+    private func uploadMatchedPhotosToS3(matchingResults: [BatchCompareResult], sharedWithUserId: Int) async {
+        let photoUploadService = PhotoUploadService()
+        let mediaItemIds = matchingResults.map { $0.photo.mediaItemId }
+        
+        if FeatureFlags.enableDebugLogPhotoUpload {
+            print("[AppState] Starting S3 upload for \(mediaItemIds.count) matched photos to user \(sharedWithUserId)")
+        }
+        
+        do {
+            let uploadResult = try await photoUploadService.uploadPhotosToS3(
+                mediaItemIds: mediaItemIds,
+                sharedWithUserId: sharedWithUserId
+            )
+            
+            if FeatureFlags.enableDebugLogPhotoUpload {
+                print("[AppState] S3 upload completed: \(uploadResult.summary.successful) successful, \(uploadResult.summary.failed) failed")
+                
+                if !uploadResult.errors.isEmpty {
+                    print("[AppState] S3 upload errors:")
+                    for error in uploadResult.errors {
+                        print("  - \(error.mediaItemId): \(error.error)")
+                    }
+                }
+            }
+            
+            // Update local photos with S3 URLs for successful uploads
+            for result in uploadResult.results {
+                if result.success, let s3Url = result.s3Url {
+                    await updatePhotoS3Url(mediaItemId: result.mediaItemId, s3Url: s3Url)
+                }
+            }
+            
+        } catch {
+            if FeatureFlags.enableDebugLogPhotoUpload {
+                print("[AppState] Error during S3 upload: \(error)")
+            }
+        }
+    }
+    
+    private func updatePhotoS3Url(mediaItemId: String, s3Url: String) async {
+        // Update the photo in our local photos array with the S3 URL
+        if let index = photos.firstIndex(where: { $0.mediaItemId == mediaItemId }) {
+            // Create updated photo with S3 URL
+            let originalPhoto = photos[index]
+            let updatedPhoto = Photo(
+                id: originalPhoto.id,
+                mediaItemId: originalPhoto.mediaItemId,
+                userId: originalPhoto.userId,
+                photoOf: originalPhoto.photoOf,
+                altText: originalPhoto.altText,
+                tags: originalPhoto.tags,
+                baseUrl: originalPhoto.baseUrl,
+                mimeType: originalPhoto.mimeType,
+                width: originalPhoto.width,
+                height: originalPhoto.height,
+                creationTime: originalPhoto.creationTime,
+                createdAt: originalPhoto.createdAt,
+                updatedAt: originalPhoto.updatedAt,
+                s3Key: nil, // We don't store the key locally
+                s3Url: s3Url,
+                sharedAt: Date()
+            )
+            
+            await MainActor.run {
+                photos[index] = updatedPhoto
+            }
+            
+            if FeatureFlags.enableDebugLogPhotoUpload {
+                print("[AppState] Updated local photo \(mediaItemId) with S3 URL")
+            }
         }
     }
     

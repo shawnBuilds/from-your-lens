@@ -28,6 +28,9 @@ struct FeatureFlags {
     static let maxImageSizeForFaceDetection = 5 * 1024 * 1024 // 5MB max image size for face detection
     static let minImageSizeForFaceDetection = 1 * 1024 // 1KB min image size for face detection
     
+    // MARK: - Photo Upload Integration
+    static let enableDebugLogPhotoUpload = true // Debug: log photo upload operations
+    
     // MARK: - OAuth Integration
     static let enableDebugLogOAuth = true // Debug: log OAuth operations and network requests
     static let enableDebugLogAuth = true // Debug: log AuthService operations and token validation

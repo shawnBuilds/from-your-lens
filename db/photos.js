@@ -41,9 +41,12 @@ const upsertPhoto = async (photoData) => {
             mime_type,
             width,
             height,
-            creation_time
+            creation_time,
+            s3_key,
+            s3_url,
+            shared_at
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
         ON CONFLICT (media_item_id) 
         DO UPDATE SET 
             photo_of = COALESCE(EXCLUDED.photo_of, photos.photo_of),
@@ -54,6 +57,9 @@ const upsertPhoto = async (photoData) => {
             width = COALESCE(EXCLUDED.width, photos.width),
             height = COALESCE(EXCLUDED.height, photos.height),
             creation_time = COALESCE(EXCLUDED.creation_time, photos.creation_time),
+            s3_key = COALESCE(EXCLUDED.s3_key, photos.s3_key),
+            s3_url = COALESCE(EXCLUDED.s3_url, photos.s3_url),
+            shared_at = COALESCE(EXCLUDED.shared_at, photos.shared_at),
             updated_at = CURRENT_TIMESTAMP
         RETURNING *;
     `;
@@ -68,7 +74,10 @@ const upsertPhoto = async (photoData) => {
         photoData.mimeType,
         photoData.width,
         photoData.height,
-        photoData.creationTime
+        photoData.creationTime,
+        photoData.s3Key || null,
+        photoData.s3Url || null,
+        photoData.sharedAt || null
     ];
 
     try {
@@ -172,6 +181,28 @@ const updatePhotoOf = async (mediaItemId, photoOf) => {
     }
 };
 
+// Update photo S3 information
+const updatePhotoS3Info = async (mediaItemId, s3Key, s3Url) => {
+    const query = `
+        UPDATE photos 
+        SET 
+            s3_key = $1,
+            s3_url = $2,
+            shared_at = CURRENT_TIMESTAMP,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE media_item_id = $3
+        RETURNING *;
+    `;
+    
+    try {
+        const result = await pool.query(query, [s3Key, s3Url, mediaItemId]);
+        return result.rows[0];
+    } catch (err) {
+        console.error('[Database] Error updating photo S3 info:', err.message);
+        throw err;
+    }
+};
+
 // Search photos by tags
 const searchPhotosByTags = async (userId, tags, { limit = 20, offset = 0 } = {}) => {
     const query = `
@@ -233,6 +264,7 @@ module.exports = {
     getPhotosOfUser,
     updatePhotoTags,
     updatePhotoOf,
+    updatePhotoS3Info,
     searchPhotosByTags,
     deletePhoto,
     getUserPhotosCount

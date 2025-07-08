@@ -1,11 +1,117 @@
 const express = require('express');
 const { verifyJWT } = require('./auth');
 const photosDb = require('../../db/photos');
+const { uploadPhotoToS3 } = require('../services/photoUploadService');
 
 const router = express.Router();
 
 // Apply authentication middleware to all routes
 router.use(verifyJWT);
+
+/**
+ * @route POST /api/photos/upload-shared
+ * @desc Upload photos to S3 when sharing with another user
+ */
+router.post('/upload-shared', async (req, res) => {
+    try {
+        const { mediaItemIds, sharedWithUserId } = req.body;
+        
+        if (!mediaItemIds || !Array.isArray(mediaItemIds) || mediaItemIds.length === 0) {
+            return res.status(400).json({
+                error: 'mediaItemIds array is required',
+                code: 'INVALID_MEDIA_ITEM_IDS'
+            });
+        }
+        
+        if (!sharedWithUserId) {
+            return res.status(400).json({
+                error: 'sharedWithUserId is required',
+                code: 'INVALID_SHARED_WITH_USER_ID'
+            });
+        }
+        
+        console.log(`[Photos] Uploading ${mediaItemIds.length} photos to S3 for sharing with user ${sharedWithUserId}`);
+        
+        const results = [];
+        const errors = [];
+        
+        // Process each photo
+        for (const mediaItemId of mediaItemIds) {
+            try {
+                // Get the photo from database
+                const photo = await photosDb.getPhotoByMediaItemId(mediaItemId);
+                
+                if (!photo) {
+                    errors.push({
+                        mediaItemId,
+                        error: 'Photo not found in database'
+                    });
+                    continue;
+                }
+                
+                // Verify ownership
+                if (photo.user_id !== req.user.id) {
+                    errors.push({
+                        mediaItemId,
+                        error: 'Unauthorized access to photo'
+                    });
+                    continue;
+                }
+                
+                // Upload to S3
+                const uploadResult = await uploadPhotoToS3(photo, req.user.id, sharedWithUserId);
+                
+                if (uploadResult.success) {
+                    // Update database with S3 info
+                    const updatedPhoto = await photosDb.updatePhotoS3Info(
+                        mediaItemId,
+                        uploadResult.s3Key,
+                        uploadResult.s3Url
+                    );
+                    
+                    results.push({
+                        mediaItemId,
+                        success: true,
+                        s3Key: uploadResult.s3Key,
+                        s3Url: uploadResult.s3Url
+                    });
+                    
+                    console.log(`[Photos] Successfully uploaded photo ${mediaItemId} to S3`);
+                } else {
+                    errors.push({
+                        mediaItemId,
+                        error: uploadResult.error
+                    });
+                }
+                
+            } catch (error) {
+                console.error(`[Photos] Error processing photo ${mediaItemId}:`, error);
+                errors.push({
+                    mediaItemId,
+                    error: error.message
+                });
+            }
+        }
+        
+        res.json({
+            success: true,
+            results,
+            errors,
+            summary: {
+                total: mediaItemIds.length,
+                successful: results.length,
+                failed: errors.length
+            }
+        });
+        
+    } catch (error) {
+        console.error('[Photos] Error uploading shared photos:', error.message);
+        res.status(500).json({ 
+            error: 'Failed to upload shared photos',
+            code: 'UPLOAD_SHARED_PHOTOS_ERROR'
+        });
+    }
+});
 
 /**
  * @route GET /api/photos

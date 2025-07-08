@@ -7,7 +7,39 @@ struct PhotoItemView: View {
     
     var body: some View {
         ZStack {
-            if photo.baseUrl.hasPrefix("icloud://") {
+            if let s3Url = photo.s3Url, !s3Url.isEmpty {
+                // Handle S3 photos (shared photos)
+                AsyncImage(url: URL(string: s3Url)) { phase in
+                    switch phase {
+                    case .empty:
+                        ProgressView()
+                            .frame(width: cellSize, height: cellSize)
+                            .background(Color(.systemGray6))
+                            .cornerRadius(8)
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: cellSize, height: cellSize)
+                            .clipped()
+                            .cornerRadius(8)
+                    case .failure:
+                        VStack {
+                            Image(systemName: "exclamationmark.triangle")
+                                .foregroundColor(.red)
+                                .font(.largeTitle)
+                            Text("Failed to load")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        .frame(width: cellSize, height: cellSize)
+                        .background(Color(.systemGray6))
+                        .cornerRadius(8)
+                    @unknown default:
+                        EmptyView()
+                    }
+                }
+            } else if photo.baseUrl.hasPrefix("icloud://") {
                 // Handle iCloud photos
                 ICloudPhotoView(photo: photo, cellSize: cellSize)
             } else {
