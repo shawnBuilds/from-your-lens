@@ -268,7 +268,14 @@ class AppState: ObservableObject {
     
     func fetchInitialPhotosOfUser() async {
         guard let user = currentUser else { 
+            if FeatureFlags.enableDebugLogServerPhotos {
+                print("[DEBUG][AppState] ❌ fetchInitialPhotosOfUser: No current user, returning early")
+            }
             return 
+        }
+        
+        if FeatureFlags.enableDebugLogServerPhotos {
+            print("[DEBUG][AppState] 🚀 Starting fetchInitialPhotosOfUser for user: \(user.id) (\(user.email))")
         }
         
         isFetchingPhotosOfYou = true
@@ -276,16 +283,17 @@ class AppState: ObservableObject {
         
         do {
             let result = try await photosService.fetchPhotosOfUser(userId: String(user.id))
-            if FeatureFlags.enableDebugLogICloudPhotos {
-                print("[DEBUG][AppState] Fetched \(result.photos.count) photos of user from iCloud")
+            if FeatureFlags.enableDebugLogServerPhotos {
+                print("[DEBUG][AppState] ✅ Successfully fetched \(result.photos.count) photos of user")
+                print("[DEBUG][AppState] 📊 Result details - Has more: \(result.hasMore), Total: \(result.total ?? 0)")
             }
             photosOfYou = result.photos
             hasMorePhotosOfYou = result.hasMore
             photosOfYouInitialFetchComplete = true
         } catch {
             fetchPhotosOfYouError = error
-            if FeatureFlags.enableDebugLogICloudPhotos {
-                print("[DEBUG][AppState] Error fetching photos of user: \(error)")
+            if FeatureFlags.enableDebugLogServerPhotos {
+                print("[DEBUG][AppState] ❌ Error fetching photos of user: \(error)")
             }
             print("[AppState] Error fetching photos of user:", error)
         }

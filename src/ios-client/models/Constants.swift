@@ -9,16 +9,17 @@ struct FeatureFlags {
     static let enableGoogleDriveUsage = false
     static let enableSkipAuthFlow = false // Set to true to enable the "skip auth" modal for development
     static let enableDebugLogSkipAuth = false // Debug: log state changes for skip auth/test data
-    static let enableDebugLogPhotoGallery = true // Debug: log data shown in photo gallery
+    static let enableDebugLogPhotoGallery = false // Debug: log data shown in photo gallery
     static let enableDebugLogLandingView = false // Debug: log layout info for landing view
     static let enableLandingGalleryImages = true // Toggle gallery images section in LandingView
     static let enableLandingHowItWorks = true // Toggle how it works section in LandingView
     
     // MARK: - iCloud Photo Integration
     static let enableICloudPhotoUsage = true // Enable iCloud photo fetching
-    static let enableDebugLogICloudPhotos = true // Debug: log iCloud photo operations
+    static let enableDebugLogICloudPhotos = false // Debug: log iCloud photo operations
     static let defaultICloudPhotoCount = 20 // Default number of photos to fetch from iCloud
     static let enableServerPhotoUsage = true // Enable server API for photos of user
+    static let enableDebugLogServerPhotos = true // Debug: log server photo operations
     static let enableTestUserWithICloudPhotos = false // Use test user with real iCloud photos instead of mock data
     
     // MARK: - Face Detection Integration

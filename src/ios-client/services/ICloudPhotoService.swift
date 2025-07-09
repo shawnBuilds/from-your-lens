@@ -150,16 +150,6 @@ class ICloudPhotoService: ICloudPhotoServiceProtocol {
         if let asset = PHAsset.fetchAssets(withLocalIdentifiers: [photo.mediaItemId], options: nil).firstObject {
             if FeatureFlags.enableDebugLogICloudPhotos {
                 print("[DEBUG][ICloudPhotoService] ✅ Found PHAsset for mediaItemId: \(photo.mediaItemId)")
-                print("[DEBUG][ICloudPhotoService] Asset localIdentifier: \(asset.localIdentifier)")
-                print("[DEBUG][ICloudPhotoService] Asset creationDate: \(asset.creationDate?.description ?? "nil")")
-                print("[DEBUG][ICloudPhotoService] Asset pixelWidth: \(asset.pixelWidth), pixelHeight: \(asset.pixelHeight)")
-                
-                // Check if we're using the same mediaItemId that was originally fetched
-                if asset.localIdentifier == photo.mediaItemId {
-                    print("[DEBUG][ICloudPhotoService] ✅ Using same mediaItemId that was originally fetched")
-                } else {
-                    print("[DEBUG][ICloudPhotoService] ❌ WARNING: mediaItemId mismatch! Expected: \(photo.mediaItemId), Found: \(asset.localIdentifier)")
-                }
             }
             return asset
         } else {

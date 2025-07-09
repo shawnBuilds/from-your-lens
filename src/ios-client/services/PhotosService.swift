@@ -43,10 +43,20 @@ class PhotosService: PhotosServiceProtocol {
     func fetchPhotosOfUser(userId: String) async throws -> PhotosResult {
         print("[PhotosService] Fetching photos of user ID: \(userId)")
         
+        if FeatureFlags.enableDebugLogServerPhotos {
+            print("[PhotosService] 🔍 Checking feature flags - enableICloudPhotoUsage: \(FeatureFlags.enableICloudPhotoUsage), enableServerPhotoUsage: \(FeatureFlags.enableServerPhotoUsage)")
+        }
+        
         // Check if iCloud photo usage is enabled
         if FeatureFlags.enableICloudPhotoUsage {
+            if FeatureFlags.enableDebugLogServerPhotos {
+                print("[PhotosService] 📱 Using iCloud photo path")
+            }
             return try await fetchPhotosOfUserFromICloud(userId: userId)
         } else {
+            if FeatureFlags.enableDebugLogServerPhotos {
+                print("[PhotosService] 🎭 Using mock photo path")
+            }
             // Fall back to mock photos
             return try await fetchPhotosOfUserFromMock(userId: userId)
         }
@@ -131,8 +141,14 @@ class PhotosService: PhotosServiceProtocol {
     private func fetchPhotosOfUserFromICloud(userId: String) async throws -> PhotosResult {
         // Check if we should use server API for photos of user
         if FeatureFlags.enableServerPhotoUsage {
+            if FeatureFlags.enableDebugLogServerPhotos {
+                print("[PhotosService] 🌐 Server photo usage enabled, calling server API")
+            }
             return try await fetchPhotosOfUserFromServer(userId: userId)
         } else {
+            if FeatureFlags.enableDebugLogServerPhotos {
+                print("[PhotosService] 📱 Server photo usage disabled, using iCloud photos")
+            }
             // Fall back to iCloud photos (current behavior)
             do {
                 let photos = try await iCloudPhotoService.fetchPhotosOfUser(count: FeatureFlags.defaultICloudPhotoCount)
@@ -162,9 +178,17 @@ class PhotosService: PhotosServiceProtocol {
     
     // MARK: - Server API Methods
     private func fetchPhotosOfUserFromServer(userId: String) async throws -> PhotosResult {
+        if FeatureFlags.enableDebugLogServerPhotos {
+            print("[PhotosService] 🚀 Starting fetchPhotosOfUserFromServer for userId: \(userId)")
+        }
+        
         guard let authToken = UserDefaults.standard.string(forKey: UserDefaultsKeys.authToken) else {
-            print("[PhotosService] No auth token found for server request")
+            print("[PhotosService] ❌ No auth token found for server request")
             return PhotosResult.mockError
+        }
+        
+        if FeatureFlags.enableDebugLogServerPhotos {
+            print("[PhotosService] ✅ Auth token found, length: \(authToken.count) characters")
         }
         
         let url = URL(string: "\(APIConfig.baseURL)/api/photos/of/\(userId)?limit=\(FeatureFlags.defaultICloudPhotoCount)&offset=0")!
@@ -172,8 +196,9 @@ class PhotosService: PhotosServiceProtocol {
         request.setValue("Bearer \(authToken)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         
-        if FeatureFlags.enableDebugLogICloudPhotos {
-            print("[PhotosService] Fetching photos of user from server: \(url)")
+        if FeatureFlags.enableDebugLogServerPhotos {
+            print("[PhotosService] 📡 Fetching photos of user from server: \(url)")
+            print("[PhotosService] 📋 Request headers - Authorization: Bearer ***, Accept: application/json")
         }
         
         do {
@@ -184,7 +209,7 @@ class PhotosService: PhotosServiceProtocol {
                 return PhotosResult.mockError
             }
             
-            if FeatureFlags.enableDebugLogICloudPhotos {
+            if FeatureFlags.enableDebugLogServerPhotos {
                 print("[PhotosService] Server response status: \(httpResponse.statusCode)")
             }
             
@@ -198,8 +223,9 @@ class PhotosService: PhotosServiceProtocol {
             
             let serverResponse = try decoder.decode(PhotosServerResponse.self, from: data)
             
-            if FeatureFlags.enableDebugLogICloudPhotos {
+            if FeatureFlags.enableDebugLogServerPhotos {
                 print("[PhotosService] Successfully fetched \(serverResponse.photos.count) photos of user from server")
+                print("[PhotosService] Response details - Total: \(serverResponse.total), Has more: \(serverResponse.has_more)")
             }
             
             return PhotosResult(
@@ -226,7 +252,7 @@ class PhotosService: PhotosServiceProtocol {
         request.setValue("Bearer \(authToken)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         
-        if FeatureFlags.enableDebugLogICloudPhotos {
+        if FeatureFlags.enableDebugLogServerPhotos {
             print("[PhotosService] Loading more photos of user from server: \(url)")
         }
         
@@ -248,7 +274,7 @@ class PhotosService: PhotosServiceProtocol {
             
             let serverResponse = try decoder.decode(PhotosServerResponse.self, from: data)
             
-            if FeatureFlags.enableDebugLogICloudPhotos {
+            if FeatureFlags.enableDebugLogServerPhotos {
                 print("[PhotosService] Successfully loaded \(serverResponse.photos.count) more photos of user from server")
             }
             

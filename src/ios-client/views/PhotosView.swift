@@ -158,10 +158,24 @@ struct PhotosView: View {
             }
         }
         .onChange(of: selectedTab) { newTab in
-            // Tab change logging removed for cleaner console output
+            if FeatureFlags.enableDebugLogServerPhotos {
+                print("[DEBUG][PhotosView] 🔄 Tab changed to: \(newTab.rawValue)")
+                print("[DEBUG][PhotosView] 📊 Current state - photosOfYou.count: \(appState.photosOfYou.count), isFetchingPhotosOfYou: \(appState.isFetchingPhotosOfYou), photosOfYouInitialFetchComplete: \(appState.photosOfYouInitialFetchComplete)")
+            }
+            
             if newTab == .photosOfYou && appState.photosOfYou.isEmpty && !appState.isFetchingPhotosOfYou && !appState.photosOfYouInitialFetchComplete {
+                if FeatureFlags.enableDebugLogServerPhotos {
+                    print("[DEBUG][PhotosView] ✅ All conditions met! Triggering fetchInitialPhotosOfUser")
+                }
                 Task {
                     await appState.fetchInitialPhotosOfUser()
+                }
+            } else if newTab == .photosOfYou {
+                if FeatureFlags.enableDebugLogServerPhotos {
+                    print("[DEBUG][PhotosView] ❌ Conditions NOT met for fetchInitialPhotosOfUser:")
+                    print("  - photosOfYou.isEmpty: \(appState.photosOfYou.isEmpty)")
+                    print("  - !isFetchingPhotosOfYou: \(!appState.isFetchingPhotosOfYou)")
+                    print("  - !photosOfYouInitialFetchComplete: \(!appState.photosOfYouInitialFetchComplete)")
                 }
             }
         }
