@@ -1,11 +1,33 @@
 const pool = require('../db/pool');
 
-// Configuration - Set the user ID you want to check
-const TARGET_USER_ID = 1; // Change this to the user ID you want to check
+// Get target user ID from command line argument or use default
+const TARGET_USER_ID = process.argv[2] ? parseInt(process.argv[2]) : 1;
+
+// Validate the user ID
+if (isNaN(TARGET_USER_ID) || TARGET_USER_ID <= 0) {
+    console.error('❌ Invalid user ID. Please provide a positive number.');
+    console.log('Usage: node scripts/check-photos-of-user.js [user_id]');
+    console.log('Example: node scripts/check-photos-of-user.js 5');
+    process.exit(1);
+}
 
 async function checkPhotosOfUser() {
     try {
         console.log(`🔍 Checking photos where photo_of = ${TARGET_USER_ID}...\n`);
+        
+        // First, verify the user exists
+        const userCheck = await pool.query('SELECT id, email FROM users WHERE id = $1', [TARGET_USER_ID]);
+        if (userCheck.rows.length === 0) {
+            console.log(`❌ User ID ${TARGET_USER_ID} not found in the database.`);
+            console.log('\n💡 Available users:');
+            const allUsers = await pool.query('SELECT id, email FROM users ORDER BY id LIMIT 10');
+            allUsers.rows.forEach(user => {
+                console.log(`  ID: ${user.id} - ${user.email}`);
+            });
+            return;
+        }
+        
+        console.log(`✅ User found: ${userCheck.rows[0].email} (ID: ${TARGET_USER_ID})\n`);
         
         // Get photos where the target user is the subject
         const result = await pool.query(`
@@ -39,8 +61,8 @@ async function checkPhotosOfUser() {
             console.log(`❌ No photos found where photo_of = ${TARGET_USER_ID}`);
             console.log('\n💡 This could mean:');
             console.log('  - No photos have been marked as photos of this user');
-            console.log('  - The user ID might be incorrect');
             console.log('  - Photos need to be uploaded and tagged with this user');
+            console.log('  - The batch compare process hasn\'t identified photos of this user yet');
             return;
         }
 
