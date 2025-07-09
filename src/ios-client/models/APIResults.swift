@@ -346,6 +346,13 @@ extension PhotosResult {
     )
 }
 
+// MARK: - Server API Response Models
+struct PhotosServerResponse: Codable {
+    let photos: [Photo]
+    let total: Int
+    let has_more: Bool
+}
+
 extension FaceDetectionResult {
     static let mockEmpty = FaceDetectionResult(
         faces: [],

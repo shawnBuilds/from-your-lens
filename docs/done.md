@@ -40,3 +40,7 @@ A daily log of completed tasks and milestones.
 
 ## 07/07
 - Users can now request to send a friend their photos with the friend in them
+
+## 07/08
+- App now stores actual image data for users so it can be shared with friends
+- Implemented photo upload to server storage when user finds friend's face in photos

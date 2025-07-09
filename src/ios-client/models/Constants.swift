@@ -15,10 +15,11 @@ struct FeatureFlags {
     static let enableLandingHowItWorks = true // Toggle how it works section in LandingView
     
     // MARK: - iCloud Photo Integration
-    static let enableICloudPhotoUsage = true // Master switch for iCloud photo functionality
-    static let defaultICloudPhotoCount = 10 // Default number of photos to fetch from iCloud
+    static let enableICloudPhotoUsage = true // Enable iCloud photo fetching
+    static let enableDebugLogICloudPhotos = true // Debug: log iCloud photo operations
+    static let defaultICloudPhotoCount = 20 // Default number of photos to fetch from iCloud
+    static let enableServerPhotoUsage = true // Enable server API for photos of user
     static let enableTestUserWithICloudPhotos = false // Use test user with real iCloud photos instead of mock data
-    static let enableDebugLogICloudPhotos = true // Debug: log iCloud photo fetching operations
     
     // MARK: - Face Detection Integration
     static let enableFaceDetectionUsage = true // Master switch for face detection functionality

@@ -129,24 +129,140 @@ class PhotosService: PhotosServiceProtocol {
     }
     
     private func fetchPhotosOfUserFromICloud(userId: String) async throws -> PhotosResult {
-        do {
-            let photos = try await iCloudPhotoService.fetchPhotosOfUser(count: FeatureFlags.defaultICloudPhotoCount)
-            return PhotosResult(
-                photos: photos,
-                hasMore: photos.count >= FeatureFlags.defaultICloudPhotoCount,
-                total: photos.count,
-                error: nil
-            )
-        } catch {
-            print("[PhotosService] Error fetching photos of user from iCloud: \(error)")
-            return PhotosResult.mockError
+        // Check if we should use server API for photos of user
+        if FeatureFlags.enableServerPhotoUsage {
+            return try await fetchPhotosOfUserFromServer(userId: userId)
+        } else {
+            // Fall back to iCloud photos (current behavior)
+            do {
+                let photos = try await iCloudPhotoService.fetchPhotosOfUser(count: FeatureFlags.defaultICloudPhotoCount)
+                return PhotosResult(
+                    photos: photos,
+                    hasMore: photos.count >= FeatureFlags.defaultICloudPhotoCount,
+                    total: photos.count,
+                    error: nil
+                )
+            } catch {
+                print("[PhotosService] Error fetching photos of user from iCloud: \(error)")
+                return PhotosResult.mockError
+            }
         }
     }
     
     private func loadMorePhotosOfUserFromICloud(userId: String, offset: Int) async throws -> PhotosResult {
-        // For now, return empty result as we've already loaded the photos
-        // In the future, this could implement pagination
-        return PhotosResult.mockEmpty
+        // Check if we should use server API for photos of user
+        if FeatureFlags.enableServerPhotoUsage {
+            return try await loadMorePhotosOfUserFromServer(userId: userId, offset: offset)
+        } else {
+            // For now, return empty result as we've already loaded the photos
+            // In the future, this could implement pagination
+            return PhotosResult.mockEmpty
+        }
+    }
+    
+    // MARK: - Server API Methods
+    private func fetchPhotosOfUserFromServer(userId: String) async throws -> PhotosResult {
+        guard let authToken = UserDefaults.standard.string(forKey: UserDefaultsKeys.authToken) else {
+            print("[PhotosService] No auth token found for server request")
+            return PhotosResult.mockError
+        }
+        
+        let url = URL(string: "\(APIConfig.baseURL)/api/photos/of/\(userId)?limit=\(FeatureFlags.defaultICloudPhotoCount)&offset=0")!
+        var request = URLRequest(url: url)
+        request.setValue("Bearer \(authToken)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        
+        if FeatureFlags.enableDebugLogICloudPhotos {
+            print("[PhotosService] Fetching photos of user from server: \(url)")
+        }
+        
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            
+            guard let httpResponse = response as? HTTPURLResponse else {
+                print("[PhotosService] Invalid response type from server")
+                return PhotosResult.mockError
+            }
+            
+            if FeatureFlags.enableDebugLogICloudPhotos {
+                print("[PhotosService] Server response status: \(httpResponse.statusCode)")
+            }
+            
+            guard httpResponse.statusCode == 200 else {
+                print("[PhotosService] Server error: \(httpResponse.statusCode)")
+                return PhotosResult.mockError
+            }
+            
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+            
+            let serverResponse = try decoder.decode(PhotosServerResponse.self, from: data)
+            
+            if FeatureFlags.enableDebugLogICloudPhotos {
+                print("[PhotosService] Successfully fetched \(serverResponse.photos.count) photos of user from server")
+            }
+            
+            return PhotosResult(
+                photos: serverResponse.photos,
+                hasMore: serverResponse.has_more,
+                total: serverResponse.total,
+                error: nil
+            )
+            
+        } catch {
+            print("[PhotosService] Error fetching photos of user from server: \(error)")
+            return PhotosResult.mockError
+        }
+    }
+    
+    private func loadMorePhotosOfUserFromServer(userId: String, offset: Int) async throws -> PhotosResult {
+        guard let authToken = UserDefaults.standard.string(forKey: UserDefaultsKeys.authToken) else {
+            print("[PhotosService] No auth token found for server request")
+            return PhotosResult.mockError
+        }
+        
+        let url = URL(string: "\(APIConfig.baseURL)/api/photos/of/\(userId)?limit=\(FeatureFlags.defaultICloudPhotoCount)&offset=\(offset)")!
+        var request = URLRequest(url: url)
+        request.setValue("Bearer \(authToken)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        
+        if FeatureFlags.enableDebugLogICloudPhotos {
+            print("[PhotosService] Loading more photos of user from server: \(url)")
+        }
+        
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            
+            guard let httpResponse = response as? HTTPURLResponse else {
+                print("[PhotosService] Invalid response type from server")
+                return PhotosResult.mockError
+            }
+            
+            guard httpResponse.statusCode == 200 else {
+                print("[PhotosService] Server error: \(httpResponse.statusCode)")
+                return PhotosResult.mockError
+            }
+            
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+            
+            let serverResponse = try decoder.decode(PhotosServerResponse.self, from: data)
+            
+            if FeatureFlags.enableDebugLogICloudPhotos {
+                print("[PhotosService] Successfully loaded \(serverResponse.photos.count) more photos of user from server")
+            }
+            
+            return PhotosResult(
+                photos: serverResponse.photos,
+                hasMore: serverResponse.has_more,
+                total: serverResponse.total,
+                error: nil
+            )
+            
+        } catch {
+            print("[PhotosService] Error loading more photos of user from server: \(error)")
+            return PhotosResult.mockError
+        }
     }
     
     // MARK: - Mock Photo Methods (for fallback)

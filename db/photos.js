@@ -256,6 +256,23 @@ const getUserPhotosCount = async (userId) => {
     }
 };
 
+// Get total count of photos where user is the subject
+const getPhotosOfUserCount = async (userId) => {
+    const query = `
+        SELECT COUNT(*) as total
+        FROM photos 
+        WHERE photo_of = $1;
+    `;
+    
+    try {
+        const result = await pool.query(query, [userId]);
+        return parseInt(result.rows[0].total);
+    } catch (err) {
+        console.error('[Database] Error getting photos of user count:', err.message);
+        throw err;
+    }
+};
+
 module.exports = {
     createPhotosTable,
     upsertPhoto,
@@ -267,5 +284,6 @@ module.exports = {
     updatePhotoS3Info,
     searchPhotosByTags,
     deletePhoto,
-    getUserPhotosCount
+    getUserPhotosCount,
+    getPhotosOfUserCount
 }; 

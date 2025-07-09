@@ -11,8 +11,7 @@ struct PhotosView: View {
         case .allPhotos:
             return appState.photos
         case .photosOfYou:
-            guard let userId = appState.currentUser?.id else { return [] }
-            return appState.photos.filter { $0.photoOf == userId }
+            return appState.photosOfYou
         }
     }
     
@@ -93,10 +92,12 @@ struct PhotosView: View {
             // Photo gallery
             PhotoGalleryView(
                 photos: filteredPhotos,
-                isLoading: appState.isFetchingPhotos,
-                error: appState.fetchPhotosError?.localizedDescription,
-                loadMore: nil, // Add pagination later
-                hasMore: false,
+                isLoading: selectedTab == .allPhotos ? appState.isFetchingPhotos : appState.isFetchingPhotosOfYou,
+                error: selectedTab == .allPhotos ? appState.fetchPhotosError?.localizedDescription : appState.fetchPhotosOfYouError?.localizedDescription,
+                loadMore: selectedTab == .allPhotos ? nil : { 
+                    Task { await appState.loadMorePhotosOfUser() }
+                },
+                hasMore: selectedTab == .allPhotos ? appState.hasMorePhotos : appState.hasMorePhotosOfYou,
                 emptyMessage: emptyMessage
             )
             Spacer(minLength: 0)
@@ -158,6 +159,11 @@ struct PhotosView: View {
         }
         .onChange(of: selectedTab) { newTab in
             // Tab change logging removed for cleaner console output
+            if newTab == .photosOfYou && appState.photosOfYou.isEmpty && !appState.isFetchingPhotosOfYou && !appState.photosOfYouInitialFetchComplete {
+                Task {
+                    await appState.fetchInitialPhotosOfUser()
+                }
+            }
         }
     }
 }
