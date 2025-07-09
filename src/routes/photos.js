@@ -111,11 +111,11 @@ router.post('/upload-shared', async (req, res) => {
                             mediaItemId: mediaItemId,
                             userId: req.user.id,
                             photoOf: sharedWithUserId, // Set photo_of to the user being shared with
-                            baseUrl: photoData.baseUrl || 'icloud://' + mediaItemId,
+                            baseUrl: 'icloud://' + mediaItemId,
                             mimeType: contentType,
-                            width: photoData.width || null,
-                            height: photoData.height || null,
-                            creationTime: photoData.creationTime || new Date(),
+                            width: null,
+                            height: null,
+                            creationTime: new Date(),
                             s3Key: s3Key,
                             s3Url: s3Url,
                             sharedAt: new Date()
