@@ -96,13 +96,61 @@ router.post('/upload-shared', async (req, res) => {
                 // Generate S3 URL
                 const s3Url = `https://${process.env.AWS_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${s3Key}`;
                 
-                // Update database with S3 info if photo exists
+                // Insert or update photo metadata in database
                 try {
-                    await photosDb.updatePhotoS3Info(mediaItemId, s3Key, s3Url);
+                    // Check if photo exists in database
+                    const existingPhoto = await photosDb.getPhotoByMediaItemId(mediaItemId);
+                    
+                    if (!existingPhoto) {
+                        // Photo doesn't exist, insert it with photo_of set to sharedWithUserId
+                        if (Controls.enableDebugLogPhotoUpload) {
+                            console.log(`[Photos] Photo ${mediaItemId} not in database, inserting new record`);
+                        }
+                        
+                        const photoData = {
+                            mediaItemId: mediaItemId,
+                            userId: req.user.id,
+                            photoOf: sharedWithUserId, // Set photo_of to the user being shared with
+                            baseUrl: photoData.baseUrl || 'icloud://' + mediaItemId,
+                            mimeType: contentType,
+                            width: photoData.width || null,
+                            height: photoData.height || null,
+                            creationTime: photoData.creationTime || new Date(),
+                            s3Key: s3Key,
+                            s3Url: s3Url,
+                            sharedAt: new Date()
+                        };
+                        
+                        await photosDb.upsertPhoto(photoData);
+                        
+                        if (Controls.enableDebugLogPhotoUpload) {
+                            console.log(`[Photos] Successfully inserted photo ${mediaItemId} with photo_of = ${sharedWithUserId}`);
+                        }
+                    } else {
+                        // Photo exists, update S3 info and ensure photo_of is set
+                        if (Controls.enableDebugLogPhotoUpload) {
+                            console.log(`[Photos] Photo ${mediaItemId} exists in database, updating S3 info`);
+                        }
+                        
+                        await photosDb.updatePhotoS3Info(mediaItemId, s3Key, s3Url);
+                        
+                        // If photo_of is not set, set it to sharedWithUserId
+                        if (!existingPhoto.photo_of) {
+                            if (Controls.enableDebugLogPhotoUpload) {
+                                console.log(`[Photos] Setting photo_of for ${mediaItemId} to ${sharedWithUserId}`);
+                            }
+                            await photosDb.updatePhotoOf(mediaItemId, sharedWithUserId);
+                        }
+                    }
                 } catch (dbError) {
                     if (Controls.enableDebugLogPhotoUpload) {
-                        console.log(`[Photos] Photo ${mediaItemId} not in database, skipping DB update`);
+                        console.error(`[Photos] Database error for photo ${mediaItemId}:`, dbError);
                     }
+                    errors.push({
+                        mediaItemId,
+                        error: `Database error: ${dbError.message}`
+                    });
+                    continue;
                 }
                 
                 results.push({
