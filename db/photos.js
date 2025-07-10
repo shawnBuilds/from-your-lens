@@ -1,5 +1,23 @@
 const pool = require('./pool');
 
+// Utility function to format database timestamps to ISO8601 strings
+const formatPhotoDates = (photo) => {
+    if (!photo) return photo;
+    
+    return {
+        ...photo,
+        creation_time: photo.creation_time ? new Date(photo.creation_time).toISOString() : null,
+        created_at: photo.created_at ? new Date(photo.created_at).toISOString() : null,
+        updated_at: photo.updated_at ? new Date(photo.updated_at).toISOString() : null,
+        shared_at: photo.shared_at ? new Date(photo.shared_at).toISOString() : null
+    };
+};
+
+// Utility function to format arrays of photos
+const formatPhotoArray = (photos) => {
+    return photos.map(formatPhotoDates);
+};
+
 // Create photos table if it doesn't exist
 const createPhotosTable = async () => {
     const query = `
@@ -82,7 +100,7 @@ const upsertPhoto = async (photoData) => {
 
     try {
         const result = await pool.query(query, values);
-        return result.rows[0];
+        return formatPhotoDates(result.rows[0]);
     } catch (err) {
         console.error('[Database] Error upserting photo:', err.message);
         throw err;
@@ -98,7 +116,7 @@ const getPhotoByMediaItemId = async (mediaItemId) => {
     
     try {
         const result = await pool.query(query, [mediaItemId]);
-        return result.rows[0];
+        return formatPhotoDates(result.rows[0]);
     } catch (err) {
         console.error('[Database] Error getting photo by media item ID:', err.message);
         throw err;
@@ -116,7 +134,7 @@ const getUserPhotos = async (userId, { limit = 20, offset = 0 } = {}) => {
     
     try {
         const result = await pool.query(query, [userId, limit, offset]);
-        return result.rows;
+        return formatPhotoArray(result.rows);
     } catch (err) {
         console.error('[Database] Error getting user photos:', err.message);
         throw err;
@@ -134,7 +152,7 @@ const getPhotosOfUser = async (userId, { limit = 20, offset = 0 } = {}) => {
     
     try {
         const result = await pool.query(query, [userId, limit, offset]);
-        return result.rows;
+        return formatPhotoArray(result.rows);
     } catch (err) {
         console.error('[Database] Error getting photos of user:', err.message);
         throw err;
@@ -154,7 +172,7 @@ const updatePhotoTags = async (mediaItemId, tags) => {
     
     try {
         const result = await pool.query(query, [tags, mediaItemId]);
-        return result.rows[0];
+        return formatPhotoDates(result.rows[0]);
     } catch (err) {
         console.error('[Database] Error updating photo tags:', err.message);
         throw err;
@@ -174,7 +192,7 @@ const updatePhotoOf = async (mediaItemId, photoOf) => {
     
     try {
         const result = await pool.query(query, [photoOf, mediaItemId]);
-        return result.rows[0];
+        return formatPhotoDates(result.rows[0]);
     } catch (err) {
         console.error('[Database] Error updating photo subject:', err.message);
         throw err;
@@ -196,7 +214,7 @@ const updatePhotoS3Info = async (mediaItemId, s3Key, s3Url) => {
     
     try {
         const result = await pool.query(query, [s3Key, s3Url, mediaItemId]);
-        return result.rows[0];
+        return formatPhotoDates(result.rows[0]);
     } catch (err) {
         console.error('[Database] Error updating photo S3 info:', err.message);
         throw err;
@@ -215,7 +233,7 @@ const searchPhotosByTags = async (userId, tags, { limit = 20, offset = 0 } = {})
     
     try {
         const result = await pool.query(query, [userId, tags, limit, offset]);
-        return result.rows;
+        return formatPhotoArray(result.rows);
     } catch (err) {
         console.error('[Database] Error searching photos by tags:', err.message);
         throw err;
@@ -232,7 +250,7 @@ const deletePhoto = async (mediaItemId) => {
     
     try {
         const result = await pool.query(query, [mediaItemId]);
-        return result.rows[0];
+        return formatPhotoDates(result.rows[0]);
     } catch (err) {
         console.error('[Database] Error deleting photo:', err.message);
         throw err;

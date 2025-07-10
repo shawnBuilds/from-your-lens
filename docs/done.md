@@ -44,3 +44,6 @@ A daily log of completed tasks and milestones.
 ## 07/08
 - App now stores actual image data for users so it can be shared with friends
 - Implemented photo upload to server storage when user finds friend's face in photos
+
+## 07/09
+- Photo sharing improvements. The database now stores image references that match those in server storage, enabling users to get photos shared by other users
