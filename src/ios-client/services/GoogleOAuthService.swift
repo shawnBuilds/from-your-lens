@@ -177,7 +177,6 @@ class GoogleOAuthService: ObservableObject {
         
         if FeatureFlags.enableDebugLogOAuth {
             print("[GoogleOAuth] Sending token exchange request to: \(url)")
-            print("[GoogleOAuth] Request body keys: \(body.keys)")
         }
         
         let (data, response) = try await URLSession.shared.data(for: request)
@@ -186,9 +185,7 @@ class GoogleOAuthService: ObservableObject {
             throw OAuthError.invalidResponse
         }
         
-        if FeatureFlags.enableDebugLogOAuth {
-            print("[GoogleOAuth] Server response status: \(httpResponse.statusCode)")
-        }
+
         
         if httpResponse.statusCode != 200 {
             let errorData = String(data: data, encoding: .utf8) ?? "No error data"
@@ -198,16 +195,11 @@ class GoogleOAuthService: ObservableObject {
             throw OAuthError.serverError(httpResponse.statusCode)
         }
         
-        // Log the raw response for debugging
-        if FeatureFlags.enableDebugLogOAuth {
-            let responseString = String(data: data, encoding: .utf8) ?? "Unable to decode response"
-            print("[GoogleOAuth] Raw server response: \(responseString)")
-        }
+
         
         do {
             let jwtResponse = try JSONDecoder().decode(JWTResponse.self, from: data)
             if FeatureFlags.enableDebugLogOAuth {
-                print("[GoogleOAuth] Successfully decoded JWT response")
                 print("[GoogleOAuth] User ID: \(jwtResponse.user.id)")
                 print("[GoogleOAuth] User email: \(jwtResponse.user.email)")
             }

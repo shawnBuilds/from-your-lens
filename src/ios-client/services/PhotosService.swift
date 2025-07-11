@@ -1,5 +1,21 @@
 import Foundation
 
+// MARK: - DateFormatter Extension
+extension DateFormatter {
+    func apply(_ configure: (DateFormatter) -> Void) -> DateFormatter {
+        configure(self)
+        return self
+    }
+}
+
+// MARK: - ISO8601DateFormatter Extension
+extension ISO8601DateFormatter {
+    func apply(_ configure: (ISO8601DateFormatter) -> Void) -> ISO8601DateFormatter {
+        configure(self)
+        return self
+    }
+}
+
 // MARK: - Protocol Definition
 protocol PhotosServiceProtocol {
     func fetchUserPhotos(userId: String) async throws -> PhotosResult
@@ -43,20 +59,10 @@ class PhotosService: PhotosServiceProtocol {
     func fetchPhotosOfUser(userId: String) async throws -> PhotosResult {
         print("[PhotosService] Fetching photos of user ID: \(userId)")
         
-        if FeatureFlags.enableDebugLogServerPhotos {
-            print("[PhotosService] 🔍 Checking feature flags - enableICloudPhotoUsage: \(FeatureFlags.enableICloudPhotoUsage), enableServerPhotoUsage: \(FeatureFlags.enableServerPhotoUsage)")
-        }
-        
         // Check if iCloud photo usage is enabled
         if FeatureFlags.enableICloudPhotoUsage {
-            if FeatureFlags.enableDebugLogServerPhotos {
-                print("[PhotosService] 📱 Using iCloud photo path")
-            }
             return try await fetchPhotosOfUserFromICloud(userId: userId)
         } else {
-            if FeatureFlags.enableDebugLogServerPhotos {
-                print("[PhotosService] 🎭 Using mock photo path")
-            }
             // Fall back to mock photos
             return try await fetchPhotosOfUserFromMock(userId: userId)
         }
@@ -141,14 +147,8 @@ class PhotosService: PhotosServiceProtocol {
     private func fetchPhotosOfUserFromICloud(userId: String) async throws -> PhotosResult {
         // Check if we should use server API for photos of user
         if FeatureFlags.enableServerPhotoUsage {
-            if FeatureFlags.enableDebugLogServerPhotos {
-                print("[PhotosService] 🌐 Server photo usage enabled, calling server API")
-            }
             return try await fetchPhotosOfUserFromServer(userId: userId)
         } else {
-            if FeatureFlags.enableDebugLogServerPhotos {
-                print("[PhotosService] 📱 Server photo usage disabled, using iCloud photos")
-            }
             // Fall back to iCloud photos (current behavior)
             do {
                 let photos = try await iCloudPhotoService.fetchPhotosOfUser(count: FeatureFlags.defaultICloudPhotoCount)
@@ -178,28 +178,15 @@ class PhotosService: PhotosServiceProtocol {
     
     // MARK: - Server API Methods
     private func fetchPhotosOfUserFromServer(userId: String) async throws -> PhotosResult {
-        if FeatureFlags.enableDebugLogServerPhotos {
-            print("[PhotosService] 🚀 Starting fetchPhotosOfUserFromServer for userId: \(userId)")
-        }
-        
         guard let authToken = UserDefaults.standard.string(forKey: UserDefaultsKeys.authToken) else {
             print("[PhotosService] ❌ No auth token found for server request")
             return PhotosResult.mockError
-        }
-        
-        if FeatureFlags.enableDebugLogServerPhotos {
-            print("[PhotosService] ✅ Auth token found, length: \(authToken.count) characters")
         }
         
         let url = URL(string: "\(APIConfig.baseURL)/api/photos/of/\(userId)?limit=\(FeatureFlags.defaultICloudPhotoCount)&offset=0")!
         var request = URLRequest(url: url)
         request.setValue("Bearer \(authToken)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-        
-        if FeatureFlags.enableDebugLogServerPhotos {
-            print("[PhotosService] 📡 Fetching photos of user from server: \(url)")
-            print("[PhotosService] 📋 Request headers - Authorization: Bearer ***, Accept: application/json")
-        }
         
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
@@ -209,23 +196,55 @@ class PhotosService: PhotosServiceProtocol {
                 return PhotosResult.mockError
             }
             
-            if FeatureFlags.enableDebugLogServerPhotos {
-                print("[PhotosService] Server response status: \(httpResponse.statusCode)")
-            }
+
             
             guard httpResponse.statusCode == 200 else {
                 print("[PhotosService] Server error: \(httpResponse.statusCode)")
                 return PhotosResult.mockError
             }
             
-            let decoder = JSONDecoder()
-            decoder.dateDecodingStrategy = .iso8601
-            
-            let serverResponse = try decoder.decode(PhotosServerResponse.self, from: data)
+            // Try custom date decoding first, fallback to ISO8601
+            let serverResponse: PhotosServerResponse
+            do {
+                let decoder = JSONDecoder()
+                decoder.dateDecodingStrategy = .custom { decoder in
+                    let container = try decoder.singleValueContainer()
+                    let dateString = try container.decode(String.self)
+                    
+                    // Inside the custom dateDecodingStrategy closure:
+                    let isoFormatter = ISO8601DateFormatter()
+                    let dateFormatters: [DateFormatter] = [
+                        DateFormatter().apply { $0.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSZ" },
+                        DateFormatter().apply { $0.dateFormat = "yyyy-MM-dd'T'HH:mm:ssZ" },
+                        DateFormatter().apply { $0.dateFormat = "yyyy-MM-dd HH:mm:ss" }
+                    ]
+                    
+                    if let date = isoFormatter.date(from: dateString) {
+                        return date
+                    }
+                    for formatter in dateFormatters {
+                        if let date = formatter.date(from: dateString) {
+                            return date
+                        }
+                    }
+                    // If all formatters fail, throw error
+                    throw DecodingError.dataCorruptedError(in: container, debugDescription: "Date string does not match any expected format: \(dateString)")
+                }
+                
+                serverResponse = try decoder.decode(PhotosServerResponse.self, from: data)
+            } catch {
+                if FeatureFlags.enableDebugLogServerPhotos {
+                    print("[PhotosService] Custom date decoding failed, trying ISO8601: \(error)")
+                }
+                
+                // Fallback to ISO8601
+                let decoder = JSONDecoder()
+                decoder.dateDecodingStrategy = .iso8601
+                serverResponse = try decoder.decode(PhotosServerResponse.self, from: data)
+            }
             
             if FeatureFlags.enableDebugLogServerPhotos {
-                print("[PhotosService] Successfully fetched \(serverResponse.photos.count) photos of user from server")
-                print("[PhotosService] Response details - Total: \(serverResponse.total), Has more: \(serverResponse.has_more)")
+                print("[PhotosService] ✅ Successfully fetched \(serverResponse.photos.count) photos of user from server")
             }
             
             return PhotosResult(
@@ -269,10 +288,45 @@ class PhotosService: PhotosServiceProtocol {
                 return PhotosResult.mockError
             }
             
-            let decoder = JSONDecoder()
-            decoder.dateDecodingStrategy = .iso8601
-            
-            let serverResponse = try decoder.decode(PhotosServerResponse.self, from: data)
+            // Try custom date decoding first, fallback to ISO8601
+            let serverResponse: PhotosServerResponse
+            do {
+                let decoder = JSONDecoder()
+                decoder.dateDecodingStrategy = .custom { decoder in
+                    let container = try decoder.singleValueContainer()
+                    let dateString = try container.decode(String.self)
+                    
+                    // Inside the custom dateDecodingStrategy closure:
+                    let isoFormatter = ISO8601DateFormatter()
+                    let dateFormatters: [DateFormatter] = [
+                        DateFormatter().apply { $0.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSZ" },
+                        DateFormatter().apply { $0.dateFormat = "yyyy-MM-dd'T'HH:mm:ssZ" },
+                        DateFormatter().apply { $0.dateFormat = "yyyy-MM-dd HH:mm:ss" }
+                    ]
+                    
+                    if let date = isoFormatter.date(from: dateString) {
+                        return date
+                    }
+                    for formatter in dateFormatters {
+                        if let date = formatter.date(from: dateString) {
+                            return date
+                        }
+                    }
+                    // If all formatters fail, throw error
+                    throw DecodingError.dataCorruptedError(in: container, debugDescription: "Date string does not match any expected format: \(dateString)")
+                }
+                
+                serverResponse = try decoder.decode(PhotosServerResponse.self, from: data)
+            } catch {
+                if FeatureFlags.enableDebugLogServerPhotos {
+                    print("[PhotosService] Custom date decoding failed, trying ISO8601: \(error)")
+                }
+                
+                // Fallback to ISO8601
+                let decoder = JSONDecoder()
+                decoder.dateDecodingStrategy = .iso8601
+                serverResponse = try decoder.decode(PhotosServerResponse.self, from: data)
+            }
             
             if FeatureFlags.enableDebugLogServerPhotos {
                 print("[PhotosService] Successfully loaded \(serverResponse.photos.count) more photos of user from server")

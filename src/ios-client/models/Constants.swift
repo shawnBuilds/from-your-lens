@@ -10,34 +10,37 @@ struct FeatureFlags {
     static let enableSkipAuthFlow = false // Set to true to enable the "skip auth" modal for development
     static let enableDebugLogSkipAuth = false // Debug: log state changes for skip auth/test data
     static let enableDebugLogPhotoGallery = false // Debug: log data shown in photo gallery
-    static let enableDebugLogLandingView = false // Debug: log layout info for landing view
+    static let enableDebugLogLandingView = true // Debug: log layout info for landing view
     static let enableLandingGalleryImages = true // Toggle gallery images section in LandingView
     static let enableLandingHowItWorks = true // Toggle how it works section in LandingView
+    static let enableAssetPreloading = true // Enable asset preloading before showing landing view
+    static let enableDebugLogAssetPreloading = true // Debug: log asset preloading operations
     
     // MARK: - iCloud Photo Integration
     static let enableICloudPhotoUsage = true // Enable iCloud photo fetching
     static let enableDebugLogICloudPhotos = false // Debug: log iCloud photo operations
     static let defaultICloudPhotoCount = 20 // Default number of photos to fetch from iCloud
     static let enableServerPhotoUsage = true // Enable server API for photos of user
-    static let enableDebugLogServerPhotos = true // Debug: log server photo operations
+    static let enableDebugLogServerPhotos = false // Debug: log server photo operations
     static let enableTestUserWithICloudPhotos = false // Use test user with real iCloud photos instead of mock data
     
     // MARK: - Face Detection Integration
     static let enableFaceDetectionUsage = true // Master switch for face detection functionality
-    static let enableDebugLogFaceDetection = true // Debug: log face detection operations
+    static let enableDebugLogFaceDetection = false // Debug: log face detection operations
     static let enableDebugBatchCompareModal = true // Debug: log batch compare modal operations
     static let faceDetectionSimilarityThreshold = 90.0 // Minimum similarity threshold for face matching
     static let maxImageSizeForFaceDetection = 5 * 1024 * 1024 // 5MB max image size for face detection
     static let minImageSizeForFaceDetection = 1 * 1024 // 1KB min image size for face detection
     
     // MARK: - Photo Upload Integration
-    static let enableDebugLogPhotoUpload = true // Debug: log photo upload operations
+    static let enableDebugLogPhotoUpload = false // Debug: log photo upload operations
     
     // MARK: - OAuth Integration
-    static let enableDebugLogOAuth = true // Debug: log OAuth operations and network requests
+    static let enableDebugLogOAuth = false // Debug: log OAuth operations and network requests
     static let enableDebugLogAuth = true // Debug: log AuthService operations and token validation
     static let enableDebugLogUser = false // Debug: log user fetch/search operations
     static let enableAutoProfilePicturePrompt = true // Auto-show PFP picker for users without profile pictures
+    static let enableUpdateFilteredUsersInSearch = true // Debug: enable/disable filtering in UserSearchModal
 }        
 
 // MARK: - API Configuration

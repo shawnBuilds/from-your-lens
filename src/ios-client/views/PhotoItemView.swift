@@ -9,6 +9,7 @@ struct PhotoItemView: View {
         ZStack {
             if let s3Url = photo.s3Url, !s3Url.isEmpty {
                 // Handle S3 photos (shared photos)
+                let _ = print("[PhotoItemView] 📸 Using S3 URL: \(s3Url)")
                 AsyncImage(url: URL(string: s3Url)) { phase in
                     switch phase {
                     case .empty:
@@ -23,7 +24,8 @@ struct PhotoItemView: View {
                             .frame(width: cellSize, height: cellSize)
                             .clipped()
                             .cornerRadius(8)
-                    case .failure:
+                    case .failure(let error):
+                        let _ = print("[PhotoItemView] ❌ S3 image load failed: \(error)")
                         VStack {
                             Image(systemName: "exclamationmark.triangle")
                                 .foregroundColor(.red)
@@ -58,7 +60,8 @@ struct PhotoItemView: View {
                             .frame(width: cellSize, height: cellSize)
                             .clipped()
                             .cornerRadius(8)
-                    case .failure:
+                    case .failure(let error):
+                        let _ = print("[PhotoItemView] ❌ Regular image load failed: \(error)")
                         VStack {
                             Image(systemName: "exclamationmark.triangle")
                                 .foregroundColor(.red)

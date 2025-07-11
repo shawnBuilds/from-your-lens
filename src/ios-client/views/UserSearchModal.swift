@@ -6,14 +6,28 @@ struct UserSearchModal: View {
     @State private var searchText = ""
     @State private var debouncedSearchText = ""
     @State private var filteredUsers: [User] = []
+    @State private var isKeyboardVisible = false
+    @State private var keyboardAppearTime: Date?
+    @State private var isKeyboardReady = false
+    @FocusState private var isSearchFieldFocused: Bool
     
     // Debounced search text to avoid excessive filtering
     private func updateSearchText(_ newText: String) {
         searchText = newText
         
+        // Early return if filtering is disabled
+        guard FeatureFlags.enableUpdateFilteredUsersInSearch else {
+            return
+        }
+        
+
+        
+        // Use a shorter debounce for first input to reduce perceived lag
+        let debounceTime: UInt64 = debouncedSearchText.isEmpty ? 150_000_000 : 300_000_000
+        
         // Debounce the search to avoid excessive filtering
         Task {
-            try? await Task.sleep(nanoseconds: 150_000_000) // 150ms delay (reduced from 300ms)
+            try? await Task.sleep(nanoseconds: debounceTime)
             await MainActor.run {
                 if searchText == newText { // Only update if text hasn't changed
                     debouncedSearchText = newText
@@ -24,23 +38,46 @@ struct UserSearchModal: View {
     }
     
     private func updateFilteredUsers() {
+        // Early return if filtering is disabled
+        guard FeatureFlags.enableUpdateFilteredUsersInSearch else {
+            return
+        }
+        
         // Run filtering off the main thread to prevent UI blocking
         Task {
-            // First filter out the current user
-            let usersExcludingCurrent = appState.allUsers.filter { user in
-                user.id != appState.currentUser?.id
+            // Add a small delay for the first filtering to let keyboard animation complete
+            if filteredUsers.isEmpty && !debouncedSearchText.isEmpty {
+                try? await Task.sleep(nanoseconds: 50_000_000) // 50ms delay
             }
+            
+            let startTime = Date()
+            
+            // Pre-compute search term once
+            let searchLower = debouncedSearchText.lowercased()
             
             // Only show users if there's a search term
             let newFilteredUsers: [User]
-            if debouncedSearchText.isEmpty {
+            if searchLower.isEmpty {
                 newFilteredUsers = []
             } else {
-                newFilteredUsers = usersExcludingCurrent.filter { user in
-                    let fullName = user.fullName?.lowercased() ?? ""
-                    let email = user.email.lowercased()
-                    let searchLower = debouncedSearchText.lowercased()
-                    return fullName.contains(searchLower) || email.contains(searchLower)
+                // Optimized filtering: pre-filter current user and use more efficient string operations
+                newFilteredUsers = appState.allUsers.compactMap { user in
+                    // Skip current user
+                    guard user.id != appState.currentUser?.id else { return nil }
+                    
+                    // Quick checks first (email is usually faster than name)
+                    if user.email.lowercased().contains(searchLower) {
+                        return user
+                    }
+                    
+                    // Then check name if available
+                    if let fullName = user.fullName, !fullName.isEmpty {
+                        if fullName.lowercased().contains(searchLower) {
+                            return user
+                        }
+                    }
+                    
+                    return nil
                 }
             }
             
@@ -52,11 +89,7 @@ struct UserSearchModal: View {
     }
     
     var body: some View {
-        ZStack {
-            Color.secondaryColor
-                .ignoresSafeArea()
-            
-            VStack(spacing: 0) {
+        VStack(spacing: 0) {
                 // Header
                 HStack {
                     Text("Send Photos to Friend")
@@ -89,8 +122,12 @@ struct UserSearchModal: View {
                     TextField("Search by name or email...", text: $searchText)
                         .textFieldStyle(PlainTextFieldStyle())
                         .foregroundColor(.textColorPrimary)
+                        .focused($isSearchFieldFocused)
                         .onChange(of: searchText) { newValue in
                             updateSearchText(newValue)
+                        }
+                        .onSubmit {
+                            // Handle search submission if needed
                         }
                 }
                 .padding(.horizontal, 16)
@@ -153,9 +190,6 @@ struct UserSearchModal: View {
                         LazyVStack(spacing: 0) {
                             ForEach(filteredUsers) { user in
                                 UserRowView(user: user) {
-                                    if FeatureFlags.enableDebugBatchCompareModal {
-                                        print("[UserSearchModal] User selected: \(user.displayName) (id: \(user.id))")
-                                    }
                                     appState.selectTargetUser(user)
                                     isPresented = false
                                 }
@@ -166,25 +200,40 @@ struct UserSearchModal: View {
                 }
             }
             .frame(maxWidth: 500, maxHeight: .infinity)
-            .padding(.vertical, 0)
+            .background(Color.secondaryColor)
             .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
             .shadow(color: Color.neumorphicShadow.opacity(0.18), radius: 8, x: 0, y: 4)
-        }
         .onAppear {
+            // Fetch users in background if needed, but don't block UI
             if appState.allUsers.isEmpty {
                 Task {
                     await appState.fetchAllUsers()
                 }
             }
             
-            // Initialize filtered users
-            updateFilteredUsers()
-            
-            if FeatureFlags.enableDebugBatchCompareModal {
-                print("[UserSearchModal] Total users: \(appState.allUsers.count)")
-                print("[UserSearchModal] Current user ID: \(appState.currentUser?.id ?? -1)")
-                print("[UserSearchModal] Filtered users (excluding current): \(filteredUsers.count)")
+            // Delay TextField focus to let keyboard system initialize
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                isSearchFieldFocused = true
             }
+        }
+        .onChange(of: isSearchFieldFocused) { isFocused in
+            if isFocused {
+                keyboardAppearTime = Date()
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
+            isKeyboardVisible = true
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardDidShowNotification)) { _ in
+            isKeyboardVisible = true
+            // Mark keyboard as ready after it's fully shown
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                isKeyboardReady = true
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
+            isKeyboardVisible = false
+            isKeyboardReady = false
         }
     }
 }
@@ -200,6 +249,8 @@ struct UserRowView: View {
             return user.email
         }
     }
+    
+
     
     var body: some View {
         Button(action: onSelect) {
@@ -218,6 +269,12 @@ struct UserRowView: View {
                     .clipShape(Circle())
                     .id(profileUrl) // Force reload when URL changes
                     .transition(.opacity) // Smooth transition
+                    .onAppear {
+                        // Preload image to improve performance
+                        if let url = URL(string: profileUrl) {
+                            URLSession.shared.dataTask(with: url).resume()
+                        }
+                    }
                 } else {
                     Image(systemName: "person.circle.fill")
                         .font(.system(size: 50))

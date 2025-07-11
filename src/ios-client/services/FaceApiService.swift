@@ -14,30 +14,17 @@ class FaceApiService: FaceApiServiceProtocol {
     
     // MARK: - FaceApiServiceProtocol Implementation
     func detectFacesWithApi(imageData: Data) async throws -> FaceDetectionResult {
-        if FeatureFlags.enableDebugLogFaceDetection {
-            print("[FaceApiService] Starting face detection for image data of size: \(imageData.count) bytes")
-        }
-        
         // Check if face detection is enabled
         if !FeatureFlags.enableFaceDetectionUsage {
-            if FeatureFlags.enableDebugLogFaceDetection {
-                print("[FaceApiService] Face detection disabled, returning mock result")
-            }
             return FaceDetectionResult.mockWithFaces
         }
         
         // Validate image data size
         guard imageData.count >= FeatureFlags.minImageSizeForFaceDetection else {
-            if FeatureFlags.enableDebugLogFaceDetection {
-                print("[FaceApiService] Image too small: \(imageData.count) bytes")
-            }
             return FaceDetectionResult.mockError
         }
         
         guard imageData.count <= FeatureFlags.maxImageSizeForFaceDetection else {
-            if FeatureFlags.enableDebugLogFaceDetection {
-                print("[FaceApiService] Image too large: \(imageData.count) bytes")
-            }
             return FaceDetectionResult.mockError
         }
         
@@ -62,76 +49,40 @@ class FaceApiService: FaceApiServiceProtocol {
             
             request.httpBody = body
             
-            if FeatureFlags.enableDebugLogFaceDetection {
-                print("[FaceApiService] Sending face detection request to: \(url)")
-            }
-            
             let (data, response) = try await session.data(for: request)
             
             guard let httpResponse = response as? HTTPURLResponse else {
-                if FeatureFlags.enableDebugLogFaceDetection {
-                    print("[FaceApiService] Invalid response type")
-                }
                 return FaceDetectionResult.mockError
             }
             
-            if FeatureFlags.enableDebugLogFaceDetection {
-                print("[FaceApiService] Face detection response status: \(httpResponse.statusCode)")
-            }
-            
             guard httpResponse.statusCode == 200 else {
-                if FeatureFlags.enableDebugLogFaceDetection {
-                    print("[FaceApiService] Face detection failed with status: \(httpResponse.statusCode)")
-                }
                 return FaceDetectionResult.mockError
             }
             
             let decoder = JSONDecoder()
             let faceDetails = try decoder.decode([FaceDetail].self, from: data)
             
-            if FeatureFlags.enableDebugLogFaceDetection {
-                print("[FaceApiService] Face detection successful, found \(faceDetails.count) faces")
-            }
-            
             return FaceDetectionResult(faces: faceDetails, error: nil)
             
         } catch {
-            if FeatureFlags.enableDebugLogFaceDetection {
-                print("[FaceApiService] Error during face detection: \(error)")
-            }
             return FaceDetectionResult.mockError
         }
     }
     
     func compareFacesWithApi(sourceImageData: Data, targetImageData: Data) async throws -> FaceComparisonResult {
-        if FeatureFlags.enableDebugLogFaceDetection {
-            print("[FaceApiService] Starting face comparison")
-            print("[FaceApiService] Source image size: \(sourceImageData.count) bytes")
-            print("[FaceApiService] Target image size: \(targetImageData.count) bytes")
-        }
-        
         // Check if face detection is enabled
         if !FeatureFlags.enableFaceDetectionUsage {
-            if FeatureFlags.enableDebugLogFaceDetection {
-                print("[FaceApiService] Face detection disabled, returning mock comparison result")
-            }
             return FaceComparisonResult.mockMatch
         }
         
         // Validate image data sizes
         guard sourceImageData.count >= FeatureFlags.minImageSizeForFaceDetection,
               targetImageData.count >= FeatureFlags.minImageSizeForFaceDetection else {
-            if FeatureFlags.enableDebugLogFaceDetection {
-                print("[FaceApiService] One or both images too small")
-            }
             return FaceComparisonResult.mockError
         }
         
         guard sourceImageData.count <= FeatureFlags.maxImageSizeForFaceDetection,
               targetImageData.count <= FeatureFlags.maxImageSizeForFaceDetection else {
-            if FeatureFlags.enableDebugLogFaceDetection {
-                print("[FaceApiService] One or both images too large")
-            }
             return FaceComparisonResult.mockError
         }
         
@@ -164,40 +115,18 @@ class FaceApiService: FaceApiServiceProtocol {
             
             request.httpBody = body
             
-            if FeatureFlags.enableDebugLogFaceDetection {
-                print("[FaceApiService] Sending face comparison request to: \(url)")
-            }
-            
             let (data, response) = try await session.data(for: request)
             
             guard let httpResponse = response as? HTTPURLResponse else {
-                if FeatureFlags.enableDebugLogFaceDetection {
-                    print("[FaceApiService] Invalid response type")
-                }
                 return FaceComparisonResult.mockError
             }
             
-            if FeatureFlags.enableDebugLogFaceDetection {
-                print("[FaceApiService] Face comparison response status: \(httpResponse.statusCode)")
-            }
-            
             guard httpResponse.statusCode == 200 else {
-                if FeatureFlags.enableDebugLogFaceDetection {
-                    print("[FaceApiService] Face comparison failed with status: \(httpResponse.statusCode)")
-                }
                 return FaceComparisonResult.mockError
             }
             
             let decoder = JSONDecoder()
             let comparisonResponse = try decoder.decode(FaceComparisonAPIResponse.self, from: data)
-            
-            if FeatureFlags.enableDebugLogFaceDetection {
-                print("[FaceApiService] Face comparison successful")
-                print("[FaceApiService] Face matches: \(comparisonResponse.FaceMatches?.count ?? 0)")
-                print("[FaceApiService] Unmatched faces: \(comparisonResponse.UnmatchedFaces?.count ?? 0)")
-                print("[FaceApiService] Source face count: \(comparisonResponse.sourceFaceCount)")
-                print("[FaceApiService] Target face count: \(comparisonResponse.targetFaceCount)")
-            }
             
             return FaceComparisonResult(
                 faceMatches: comparisonResponse.FaceMatches ?? [],
@@ -208,9 +137,6 @@ class FaceApiService: FaceApiServiceProtocol {
             )
             
         } catch {
-            if FeatureFlags.enableDebugLogFaceDetection {
-                print("[FaceApiService] Error during face comparison: \(error)")
-            }
             return FaceComparisonResult.mockError
         }
     }

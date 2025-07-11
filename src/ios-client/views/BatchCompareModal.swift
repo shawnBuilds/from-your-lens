@@ -154,7 +154,7 @@ struct BatchCompareModal: View {
 // MARK: - Header Component
 struct BatchCompareModalHeader: View {
     @Binding var isPresented: Bool
-    let appState: AppState
+    @ObservedObject var appState: AppState
     
     @MainActor
     var title: String {
@@ -198,7 +198,7 @@ struct SourcePhotoSection: View {
     @Binding var selectedSourcePhoto: Photo?
     @Binding var showingSourcePhotoPicker: Bool
     @Binding var showingProfilePicturePicker: Bool
-    let appState: AppState
+    @ObservedObject var appState: AppState
     
     @MainActor
     var sectionTitle: String {
@@ -342,7 +342,7 @@ struct TargetPhotosSection: View {
 
 // MARK: - Progress Section
 struct ProgressSection: View {
-    let appState: AppState
+    @ObservedObject var appState: AppState
     
     var body: some View {
         if appState.isBatchComparing {
@@ -419,7 +419,7 @@ struct ResultsSection: View {
 struct ActionButtonsSection: View {
     let selectedSourcePhoto: Photo?
     let selectedTargetPhotos: [Photo]
-    let appState: AppState
+    @ObservedObject var appState: AppState
     @Binding var isPresented: Bool
     
     var body: some View {
@@ -595,7 +595,7 @@ struct WaitingStateContent: View {
     @Binding var showingTargetPhotoPicker: Bool
     @Binding var showingProfilePicturePicker: Bool
     let autoPopulatedPhotos: [Photo]
-    let appState: AppState
+    @ObservedObject var appState: AppState
     
     @MainActor
     var buttonText: String {
@@ -652,7 +652,7 @@ struct WaitingStateContent: View {
 struct MatchingStateContent: View {
     let selectedSourcePhoto: Photo?
     let selectedTargetPhotos: [Photo]
-    let appState: AppState
+    @ObservedObject var appState: AppState
     
     var body: some View {
         VStack(spacing: 24) {
@@ -676,8 +676,7 @@ struct MatchingStateContent: View {
             
             // Progress bar
             FaceMatchingProgressBar(
-                matchesAttempted: appState.matchesAttempted,
-                totalTargetImages: selectedTargetPhotos.count
+                progress: appState.batchCompareProgress
             )
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
@@ -694,7 +693,7 @@ struct MatchingStateContent: View {
 struct MatchedStateContent: View {
     let selectedSourcePhoto: Photo?
     let selectedTargetPhotos: [Photo]
-    let appState: AppState
+    @ObservedObject var appState: AppState
     @Binding var isPresented: Bool
     
     var body: some View {
@@ -737,7 +736,7 @@ struct MatchedStateContent: View {
 struct ErrorStateContent: View {
     let selectedSourcePhoto: Photo?
     let selectedTargetPhotos: [Photo]
-    let appState: AppState
+    @ObservedObject var appState: AppState
     @Binding var isPresented: Bool
     
     var body: some View {

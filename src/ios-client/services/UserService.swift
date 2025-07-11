@@ -9,6 +9,11 @@ protocol UserServiceProtocol {
 
 class UserService: UserServiceProtocol {
     
+    // MARK: - Caching
+    private var cachedUsers: [User] = []
+    private var lastFetchTime: Date?
+    private let cacheValidityDuration: TimeInterval = 300 // 5 minutes
+    
     // MARK: - UserServiceProtocol Implementation
     func uploadProfilePicture(_ imageData: Data) async throws -> ProfilePictureResult {
         print("[UserService] Uploading profile picture...")
@@ -68,7 +73,17 @@ class UserService: UserServiceProtocol {
     
     // MARK: - Get All Users
     func getAllUsers() async throws -> [User] {
-        print("[UserService] Fetching all users...")
+        let startTime = Date()
+        
+        // Check cache first
+        if let lastFetch = lastFetchTime,
+           Date().timeIntervalSince(lastFetch) < cacheValidityDuration,
+           !cachedUsers.isEmpty {
+            print("[UserService] Returning \(cachedUsers.count) cached users")
+            return cachedUsers
+        }
+        
+        print("[UserService] Fetching all users from network...")
         guard let authToken = UserDefaults.standard.string(forKey: UserDefaultsKeys.authToken) else {
             throw UserServiceError.invalidData
         }
@@ -89,7 +104,13 @@ class UserService: UserServiceProtocol {
             }
             let decoder = JSONDecoder()
             let usersResponse = try decoder.decode(GetAllUsersResponse.self, from: data)
-            print("[UserService] Successfully fetched \(usersResponse.users.count) users")
+            
+            // Update cache
+            cachedUsers = usersResponse.users
+            lastFetchTime = Date()
+            
+            let fetchTime = Date().timeIntervalSince(startTime)
+            print("[UserService] Successfully fetched \(usersResponse.users.count) users in \(String(format: "%.3f", fetchTime))s")
             return usersResponse.users
         } else {
             let errorMessage: String

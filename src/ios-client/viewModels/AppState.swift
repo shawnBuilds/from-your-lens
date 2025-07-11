@@ -11,6 +11,11 @@ class AppState: ObservableObject {
     @Published var isLoading: Bool = true
     @Published var availableTags: [String] = []
     
+    // MARK: - Asset Preloading
+    var assetPreloadingService: AssetPreloadingService {
+        return _assetPreloadingService
+    }
+    
     // MARK: - Photo State
     @Published var photos: [Photo] = []
     @Published var isFetchingPhotos: Bool = false
@@ -49,6 +54,7 @@ class AppState: ObservableObject {
     private let userService = UserService()
     private let photosService = PhotosService()
     private let faceApiService = FaceApiService()
+    private let _assetPreloadingService = AssetPreloadingService()
     
     // MARK: - Initialization
     init() {
@@ -71,8 +77,33 @@ class AppState: ObservableObject {
     // MARK: - App Initialization
     private func initializeApp() {
         Task {
-            await checkReturningUser()
+            if FeatureFlags.enableAssetPreloading {
+                await initializeWithAssetPreloading()
+            } else {
+                await checkReturningUser()
+            }
         }
+    }
+    
+    private func initializeWithAssetPreloading() async {
+        if FeatureFlags.enableDebugLogAssetPreloading {
+            print("[AppState] Starting app initialization with asset preloading")
+        }
+        
+        // Start asset preloading
+        await _assetPreloadingService.startPreloading()
+        
+        // Wait for preloading to complete
+        while case .inProgress = _assetPreloadingService.preloadingState {
+            try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
+        }
+        
+        if FeatureFlags.enableDebugLogAssetPreloading {
+            print("[AppState] Asset preloading completed, proceeding with user check")
+        }
+        
+        // Now proceed with normal initialization
+        await checkReturningUser()
     }
     
     // MARK: - User Authentication
@@ -368,9 +399,10 @@ class AppState: ObservableObject {
             var failedComparisons = 0
             
             for (index, targetPhoto) in targetPhotos.enumerated() {
-                let progress = Double(index) / Double(targetPhotos.count)
-                batchCompareProgress = progress
                 matchesAttempted = index + 1
+                if FeatureFlags.enableDebugBatchCompareModal {
+                    print("[AppState] 🎯 matchesAttempted updated: \(matchesAttempted)/\(targetPhotos.count)")
+                }
                 
                 if FeatureFlags.enableDebugLogFaceDetection {
                     print("[AppState] 🔍 Comparing target \(index + 1)/\(targetPhotos.count): \(targetPhoto.mediaItemId)")
@@ -400,6 +432,11 @@ class AppState: ObservableObject {
                         )
                         allResults.append(errorResult)
                         failedComparisons += 1
+                        
+                        // Update progress after each photo is processed (even if failed to load)
+                        let progress = Double(index + 1) / Double(targetPhotos.count)
+                        batchCompareProgress = progress
+                        
                         continue
                     }
                     
@@ -434,6 +471,13 @@ class AppState: ObservableObject {
                         failedComparisons += 1
                     }
                     
+                    // Update progress after each photo is processed
+                    let progress = Double(index + 1) / Double(targetPhotos.count)
+                    batchCompareProgress = progress
+                    if FeatureFlags.enableDebugBatchCompareModal {
+                        print("[AppState] 📊 Progress update: \(Int(progress * 100))% (\(index + 1)/\(targetPhotos.count))")
+                    }
+                    
                 } catch {
                     if FeatureFlags.enableDebugLogFaceDetection {
                         print("[AppState] Error comparing with target \(targetPhoto.mediaItemId): \(error)")
@@ -451,6 +495,13 @@ class AppState: ObservableObject {
                     )
                     allResults.append(errorResult)
                     failedComparisons += 1
+                    
+                    // Update progress after error
+                    let progress = Double(index + 1) / Double(targetPhotos.count)
+                    batchCompareProgress = progress
+                    if FeatureFlags.enableDebugBatchCompareModal {
+                        print("[AppState] 📊 Progress update (error): \(Int(progress * 100))% (\(index + 1)/\(targetPhotos.count))")
+                    }
                 }
             }
             
@@ -512,13 +563,20 @@ class AppState: ObservableObject {
     func fetchAllUsers() async {
         guard !isFetchingUsers else { return }
         
+        let startTime = Date()
         isFetchingUsers = true
         fetchUsersError = nil
         
+        if FeatureFlags.enableDebugBatchCompareModal {
+            print("[AppState] Starting user fetch...")
+        }
+        
         do {
             allUsers = try await userService.getAllUsers()
+            let fetchTime = Date().timeIntervalSince(startTime)
+            
             if FeatureFlags.enableDebugLogAuth || FeatureFlags.enableDebugLogUser {
-                print("[AppState] Successfully fetched \(allUsers.count) users")
+                print("[AppState] Successfully fetched \(allUsers.count) users in \(String(format: "%.3f", fetchTime))s")
             }
         } catch {
             fetchUsersError = error
