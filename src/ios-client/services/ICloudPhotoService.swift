@@ -96,15 +96,6 @@ class ICloudPhotoService: ICloudPhotoServiceProtocol {
         
         if FeatureFlags.enableDebugLogICloudPhotos {
             print("[DEBUG][ICloudPhotoService] Successfully fetched \(photos.count) photos from iCloud")
-            
-            // Log the IDs of fetched photos to check for duplicates
-            let ids = photos.map { $0.id }
-            let duplicateIds = ids.filter { id in ids.filter { $0 == id }.count > 1 }
-            if !duplicateIds.isEmpty {
-                print("[DEBUG][ICloudPhotoService] WARNING: Duplicate IDs in fetched photos: \(duplicateIds)")
-            } else {
-                print("[DEBUG][ICloudPhotoService] All photo IDs are unique")
-            }
         }
         
         return photos
@@ -129,11 +120,7 @@ class ICloudPhotoService: ICloudPhotoServiceProtocol {
     
     // MARK: - Get Photo Asset
     func getPhotoAsset(for photo: Photo) async throws -> PHAsset? {
-        if FeatureFlags.enableDebugLogICloudPhotos {
-            print("[DEBUG][ICloudPhotoService] getPhotoAsset called for photo: \(photo.mediaItemId)")
-            print("[DEBUG][ICloudPhotoService] Photo baseUrl: \(photo.baseUrl)")
-            print("[DEBUG][ICloudPhotoService] Photo ID: \(photo.id)")
-        }
+        // Removed verbose getPhotoAsset logging
         
         guard await requestPhotoLibraryAccess() else {
             if FeatureFlags.enableDebugLogICloudPhotos {
@@ -142,15 +129,10 @@ class ICloudPhotoService: ICloudPhotoServiceProtocol {
             throw ICloudPhotoServiceError.accessDenied
         }
         
-        if FeatureFlags.enableDebugLogICloudPhotos {
-            print("[DEBUG][ICloudPhotoService] ✅ Photo library access granted")
-        }
+        // Removed verbose access granted logging
         
         // Try to find the asset by local identifier
         if let asset = PHAsset.fetchAssets(withLocalIdentifiers: [photo.mediaItemId], options: nil).firstObject {
-            if FeatureFlags.enableDebugLogICloudPhotos {
-                print("[DEBUG][ICloudPhotoService] ✅ Found PHAsset for mediaItemId: \(photo.mediaItemId)")
-            }
             return asset
         } else {
             if FeatureFlags.enableDebugLogICloudPhotos {
@@ -198,9 +180,7 @@ class ICloudPhotoService: ICloudPhotoServiceProtocol {
         // Create a unique base URL for the asset
         let baseUrl = "icloud://\(mediaItemId)"
         
-        if FeatureFlags.enableDebugLogICloudPhotos {
-            print("[DEBUG][ICloudPhotoService] Creating photo with ID: \(uniqueId), mediaItemId: \(mediaItemId)")
-        }
+        // Removed verbose photo creation logging
         
         return Photo(
             id: uniqueId,

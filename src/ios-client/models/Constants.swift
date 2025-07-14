@@ -5,20 +5,18 @@ struct FeatureFlags {
     static let enableFaceDetectionOnImageLoad = false
     static let showFaceCountBadge = false
     static let showTestingFormOnStart = false
-    static let defaultBatchTargetCount = 2
+    static let defaultBatchTargetCount = 5
     static let enableGoogleDriveUsage = false
     static let enableSkipAuthFlow = false // Set to true to enable the "skip auth" modal for development
     static let enableDebugLogSkipAuth = false // Debug: log state changes for skip auth/test data
-    static let enableDebugLogPhotoGallery = false // Debug: log data shown in photo gallery
+    static let enableDebugLogPhotoGallery = true // Debug: log data shown in photo gallery
     static let enableDebugLogLandingView = true // Debug: log layout info for landing view
     static let enableLandingGalleryImages = true // Toggle gallery images section in LandingView
     static let enableLandingHowItWorks = true // Toggle how it works section in LandingView
-    static let enableAssetPreloading = true // Enable asset preloading before showing landing view
-    static let enableDebugLogAssetPreloading = true // Debug: log asset preloading operations
     
     // MARK: - iCloud Photo Integration
     static let enableICloudPhotoUsage = true // Enable iCloud photo fetching
-    static let enableDebugLogICloudPhotos = false // Debug: log iCloud photo operations
+    static let enableDebugLogICloudPhotos = true // Debug: log iCloud photo operations
     static let defaultICloudPhotoCount = 20 // Default number of photos to fetch from iCloud
     static let enableServerPhotoUsage = true // Enable server API for photos of user
     static let enableDebugLogServerPhotos = false // Debug: log server photo operations

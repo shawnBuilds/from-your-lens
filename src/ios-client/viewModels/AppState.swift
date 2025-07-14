@@ -11,11 +11,6 @@ class AppState: ObservableObject {
     @Published var isLoading: Bool = true
     @Published var availableTags: [String] = []
     
-    // MARK: - Asset Preloading
-    var assetPreloadingService: AssetPreloadingService {
-        return _assetPreloadingService
-    }
-    
     // MARK: - Photo State
     @Published var photos: [Photo] = []
     @Published var isFetchingPhotos: Bool = false
@@ -54,7 +49,6 @@ class AppState: ObservableObject {
     private let userService = UserService()
     private let photosService = PhotosService()
     private let faceApiService = FaceApiService()
-    private let _assetPreloadingService = AssetPreloadingService()
     
     // MARK: - Initialization
     init() {
@@ -77,33 +71,8 @@ class AppState: ObservableObject {
     // MARK: - App Initialization
     private func initializeApp() {
         Task {
-            if FeatureFlags.enableAssetPreloading {
-                await initializeWithAssetPreloading()
-            } else {
-                await checkReturningUser()
-            }
+            await checkReturningUser()
         }
-    }
-    
-    private func initializeWithAssetPreloading() async {
-        if FeatureFlags.enableDebugLogAssetPreloading {
-            print("[AppState] Starting app initialization with asset preloading")
-        }
-        
-        // Start asset preloading
-        await _assetPreloadingService.startPreloading()
-        
-        // Wait for preloading to complete
-        while case .inProgress = _assetPreloadingService.preloadingState {
-            try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
-        }
-        
-        if FeatureFlags.enableDebugLogAssetPreloading {
-            print("[AppState] Asset preloading completed, proceeding with user check")
-        }
-        
-        // Now proceed with normal initialization
-        await checkReturningUser()
     }
     
     // MARK: - User Authentication
@@ -158,6 +127,10 @@ class AppState: ObservableObject {
         currentUser = user
         currentView = .photos
         
+        if FeatureFlags.enableDebugLogICloudPhotos {
+            print("[DEBUG][AppState] After Google sign-in - photos.count: \(photos.count)")
+        }
+        
         // Fetch photos for the user
         await fetchPhotosForUser(user)
     }
@@ -200,6 +173,44 @@ class AppState: ObservableObject {
         
         print("[AppState] Clearing client-side session data.")
         clearLocalStorage()
+        
+        // Reset all photo-related state
+        print("[AppState] Resetting photo state for clean logout")
+        // Removed verbose before reset logging
+        
+        photos = []
+        isFetchingPhotos = false
+        fetchPhotosError = nil
+        hasMorePhotos = true
+        
+        photosOfYou = []
+        isFetchingPhotosOfYou = false
+        fetchPhotosOfYouError = nil
+        hasMorePhotosOfYou = true
+        photosOfYouInitialFetchComplete = false
+        
+        // Removed verbose after reset logging
+        
+        // Reset batch compare state
+        isBatchCompareModalPresented = false
+        isBatchComparing = false
+        batchCompareProgress = 0.0
+        matchesAttempted = 0
+        batchCompareState = .waiting
+        batchCompareResults = []
+        batchCompareError = nil
+        selectedSourcePhoto = nil
+        selectedTargetPhotos = []
+        
+        // Reset user search state
+        allUsers = []
+        isFetchingUsers = false
+        fetchUsersError = nil
+        selectedTargetUser = nil
+        batchCompareMode = .findPhotos
+        
+        // Reset available tags
+        availableTags = []
         
         currentUser = nil
         currentView = .landing
@@ -254,16 +265,6 @@ class AppState: ObservableObject {
             let result = try await photosService.fetchUserPhotos(userId: String(user.id))
             if FeatureFlags.enableDebugLogICloudPhotos {
                 print("[DEBUG][AppState] Fetched \(result.photos.count) photos from iCloud")
-                
-                // Log details of first few photos for debugging
-                let samplePhotos = Array(result.photos.prefix(3))
-                for (index, photo) in samplePhotos.enumerated() {
-                    print("[DEBUG][AppState] Sample photo \(index + 1):")
-                    print("  - ID: \(photo.id)")
-                    print("  - mediaItemId: \(photo.mediaItemId)")
-                    print("  - URL: \(photo.baseUrl)")
-                    print("  - Creation time: \(photo.creationTime?.description ?? "nil")")
-                }
             }
             photos = result.photos
             hasMorePhotos = result.hasMore
@@ -400,10 +401,6 @@ class AppState: ObservableObject {
             
             for (index, targetPhoto) in targetPhotos.enumerated() {
                 matchesAttempted = index + 1
-                if FeatureFlags.enableDebugBatchCompareModal {
-                    print("[AppState] 🎯 matchesAttempted updated: \(matchesAttempted)/\(targetPhotos.count)")
-                }
-                
                 if FeatureFlags.enableDebugLogFaceDetection {
                     print("[AppState] 🔍 Comparing target \(index + 1)/\(targetPhotos.count): \(targetPhoto.mediaItemId)")
                     print("[AppState] Target photo details:")
@@ -474,9 +471,6 @@ class AppState: ObservableObject {
                     // Update progress after each photo is processed
                     let progress = Double(index + 1) / Double(targetPhotos.count)
                     batchCompareProgress = progress
-                    if FeatureFlags.enableDebugBatchCompareModal {
-                        print("[AppState] 📊 Progress update: \(Int(progress * 100))% (\(index + 1)/\(targetPhotos.count))")
-                    }
                     
                 } catch {
                     if FeatureFlags.enableDebugLogFaceDetection {
@@ -499,9 +493,7 @@ class AppState: ObservableObject {
                     // Update progress after error
                     let progress = Double(index + 1) / Double(targetPhotos.count)
                     batchCompareProgress = progress
-                    if FeatureFlags.enableDebugBatchCompareModal {
-                        print("[AppState] 📊 Progress update (error): \(Int(progress * 100))% (\(index + 1)/\(targetPhotos.count))")
-                    }
+                    
                 }
             }
             
@@ -651,15 +643,48 @@ class AppState: ObservableObject {
         // First, update photo metadata (photo_of field)
         for result in matchingResults {
             do {
-                let updatedPhoto = try await photosService.updatePhotoSubject(
-                    mediaItemId: result.photo.mediaItemId,
-                    photoOf: targetUserId
-                )
-                
-                // Update the photo in our local photos array
-                await updateSinglePhotoMetadata(updatedPhoto)
-                
-                successfulUpdates += 1
+                // For iCloud photos, we need to update the existing photo in our array
+                // rather than creating a new one from the service
+                if let index = photos.firstIndex(where: { $0.mediaItemId == result.photo.mediaItemId }) {
+                    // Update the existing photo with the new photoOf value
+                    let originalPhoto = photos[index]
+                    let updatedPhoto = Photo(
+                        id: originalPhoto.id,
+                        mediaItemId: originalPhoto.mediaItemId,
+                        userId: originalPhoto.userId,
+                        photoOf: targetUserId, // Update the photoOf field
+                        altText: originalPhoto.altText,
+                        tags: originalPhoto.tags,
+                        baseUrl: originalPhoto.baseUrl,
+                        mimeType: originalPhoto.mimeType,
+                        width: originalPhoto.width,
+                        height: originalPhoto.height,
+                        creationTime: originalPhoto.creationTime,
+                        createdAt: originalPhoto.createdAt,
+                        updatedAt: Date(),
+                        s3Key: originalPhoto.s3Key,
+                        s3Url: originalPhoto.s3Url,
+                        sharedAt: originalPhoto.sharedAt
+                    )
+                    
+                    // Update the photo in our local array
+                    photos[index] = updatedPhoto
+                    
+                    if FeatureFlags.enableDebugLogPhotoUpload {
+                        print("[AppState] Updated photo \(result.photo.mediaItemId) with photoOf: \(targetUserId)")
+                    }
+                    
+                } else {
+                    // Photo not found in local array, try the service method
+                    let updatedPhoto = try await photosService.updatePhotoSubject(
+                        mediaItemId: result.photo.mediaItemId,
+                        photoOf: targetUserId
+                    )
+                    
+                    // Update the photo in our local photos array
+                    await updateSinglePhotoMetadata(updatedPhoto)
+                    
+                }
                 
             } catch {
                 failedUpdates += 1

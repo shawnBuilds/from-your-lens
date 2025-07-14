@@ -15,9 +15,6 @@ struct BatchCompareModal: View {
         let allPhotos = appState.photos
         let maxCount = FeatureFlags.defaultBatchTargetCount
         let result = Array(allPhotos.prefix(maxCount))
-        if FeatureFlags.enableDebugBatchCompareModal {
-            print("[BatchCompareModal] Auto-populated \(result.count) target photos")
-        }
         return result
     }
     
@@ -39,9 +36,6 @@ struct BatchCompareModal: View {
         }
         
         let profilePhoto = Photo.fromProfilePicture(url: profileUrl, userId: user.id)
-        if FeatureFlags.enableDebugBatchCompareModal {
-            print("[BatchCompareModal] Auto-populated source photo with profile picture for \(appState.batchCompareMode): \(profileUrl)")
-        }
         return profilePhoto
     }
     
@@ -121,31 +115,15 @@ struct BatchCompareModal: View {
             // When profile picture picker is dismissed, check if we should auto-populate source photo
             if !isPresented && selectedSourcePhoto == nil {
                 selectedSourcePhoto = autoPopulatedSourcePhoto
-                if FeatureFlags.enableDebugBatchCompareModal {
-                    if let sourcePhoto = selectedSourcePhoto {
-                        print("[BatchCompareModal] Auto-populated source photo after PFP picker dismissal: \(sourcePhoto.baseUrl)")
-                    }
-                }
             }
         }
         .onAppear {
-            if FeatureFlags.enableDebugBatchCompareModal {
-                print("[BatchCompareModal] Modal appeared - mode: \(appState.batchCompareMode), target: \(appState.selectedTargetUser?.displayName ?? "nil")")
-            }
-            
             // Auto-populate target photos when modal appears
             selectedTargetPhotos = autoPopulatedTargetPhotos
             
             // Auto-populate source photo with profile picture when available
             if selectedSourcePhoto == nil {
                 selectedSourcePhoto = autoPopulatedSourcePhoto
-                if FeatureFlags.enableDebugBatchCompareModal {
-                    if let sourcePhoto = selectedSourcePhoto {
-                        print("[BatchCompareModal] Auto-populated source photo")
-                    } else {
-                        print("[BatchCompareModal] No profile picture available for auto-population")
-                    }
-                }
             }
         }
     }
