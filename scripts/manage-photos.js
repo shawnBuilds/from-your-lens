@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 const pool = require('../db/pool');
 const readline = require('readline');
 
@@ -31,9 +33,7 @@ const displayHeader = (title) => {
 // Main menu options
 const MAIN_MENU_OPTIONS = [
     { id: 1, label: 'Browse Users', action: browseUsers },
-    { id: 2, label: 'View Photos of Specific User', action: viewPhotosOfUser },
-    { id: 3, label: 'Delete Photo by ID', action: deletePhotoById },
-    { id: 4, label: 'Exit', action: exit }
+    { id: 2, label: 'Exit', action: exit }
 ];
 
 // User management menu options
@@ -66,7 +66,7 @@ async function showMainMenu() {
         console.log(`  ${option.id}. ${option.label}`);
     });
     
-    const choice = await askQuestion('\nEnter your choice (1-4): ');
+    const choice = await askQuestion('\nEnter your choice (1-2): ');
     const option = MAIN_MENU_OPTIONS.find(opt => opt.id === parseInt(choice));
     
     if (option) {
