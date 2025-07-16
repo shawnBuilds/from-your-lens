@@ -33,6 +33,7 @@ struct PhotoGalleryView: View {
                         LazyVGrid(columns: columns, spacing: spacing) {
                             ForEach(photos) { photo in
                                 PhotoItemView(photo: photo, cellSize: cellSize)
+                                    .environmentObject(appState)
                             }
                         }
                         .padding(.horizontal, horizontalPadding)

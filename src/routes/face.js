@@ -37,6 +37,44 @@ async function detectFacesInImage(imageBuffer, imageName) {
   }
 }
 
+// Helper function to compare faces between source and target images
+async function compareFaces(sourceBuffer, targetBuffer, sourceName, targetName) {
+  if (Controls.enableDebugLogBatchCompare) {
+    console.log(`[BatchCompare] Comparing ${sourceName} ↔ ${targetName}`);
+  }
+  
+  try {
+    const cmd = new CompareFacesCommand({
+      SourceImage: { Bytes: sourceBuffer },
+      TargetImage: { Bytes: targetBuffer },
+      SimilarityThreshold: 90,
+    });
+    
+    const { FaceMatches, UnmatchedFaces } = await rekClient.send(cmd);
+    
+    if (Controls.enableDebugLogBatchCompare) {
+      console.log(`[BatchCompare] ✅ ${targetName}: ${FaceMatches?.length || 0} matches, ${UnmatchedFaces?.length || 0} unmatched`);
+    }
+    
+    return {
+      success: true,
+      FaceMatches: FaceMatches || [],
+      UnmatchedFaces: UnmatchedFaces || [],
+      error: null
+    };
+  } catch (err) {
+    if (Controls.enableDebugLogBatchCompare) {
+      console.log(`[BatchCompare] ❌ ${targetName}: ${err.message}`);
+    }
+    return {
+      success: false,
+      FaceMatches: [],
+      UnmatchedFaces: [],
+      error: err.message
+    };
+  }
+}
+
 // POST /api/face/detect
 router.post("/detect", upload.single("image"), async (req, res) => {
   try {
@@ -255,6 +293,245 @@ router.post(
       res.json(FaceMatches);
     } catch (err) {
       res.status(500).json({ error: err.message });
+    }
+  }
+);
+
+// POST /api/face/batch-compare
+router.post(
+  "/batch-compare",
+  upload.fields([
+    { name: "source", maxCount: 1 },
+    { name: "targets", maxCount: 20 } // Allow up to 20 target images
+  ]),
+  async (req, res) => {
+    if (Controls.enableDebugLogBatchCompare) {
+      console.log("\n=== Batch Face Comparison Request Started ===");
+      console.log("Request received at:", new Date().toISOString());
+    }
+    
+    try {
+      // Validate request structure
+      if (!req.files) {
+        console.error("[BatchCompare] No files received in request");
+        return res.status(400).json({ error: "No files received" });
+      }
+
+      const sourceFile = req.files.source?.[0];
+      const targetFiles = req.files.targets || [];
+
+      if (Controls.enableDebugLogBatchCompare) {
+        console.log("\n[BatchCompare] Request Details:");
+        console.log("- Source Image:", sourceFile?.originalname);
+        console.log("- Target Images:", targetFiles.length);
+        targetFiles.forEach((file, index) => {
+          console.log(`  ${index + 1}. ${file.originalname} (${file.size} bytes)`);
+        });
+      }
+
+      // Validate source file
+      if (!sourceFile?.buffer) {
+        console.error("[BatchCompare] Missing source image buffer");
+        return res.status(400).json({ error: "Invalid source image data" });
+      }
+
+      if (sourceFile.size > MAX_IMAGE_SIZE) {
+        console.error("[BatchCompare] Source image too large");
+        return res.status(400).json({ 
+          error: "Source image size exceeds 5MB limit",
+          details: { sourceSize: sourceFile.size, maxAllowed: MAX_IMAGE_SIZE }
+        });
+      }
+
+      if (sourceFile.size < MIN_IMAGE_SIZE) {
+        console.error("[BatchCompare] Source image too small");
+        return res.status(400).json({ 
+          error: "Source image size below minimum threshold",
+          details: { sourceSize: sourceFile.size, minRequired: MIN_IMAGE_SIZE }
+        });
+      }
+
+      // Validate target files
+      if (targetFiles.length === 0) {
+        console.error("[BatchCompare] No target images provided");
+        return res.status(400).json({ error: "No target images provided" });
+      }
+
+      if (targetFiles.length > 20) {
+        console.error("[BatchCompare] Too many target images");
+        return res.status(400).json({ error: "Maximum 20 target images allowed" });
+      }
+
+      // Validate all target files
+      for (const targetFile of targetFiles) {
+        if (!targetFile.buffer) {
+          console.error("[BatchCompare] Missing target image buffer");
+          return res.status(400).json({ error: "Invalid target image data" });
+        }
+
+        if (targetFile.size > MAX_IMAGE_SIZE) {
+          console.error("[BatchCompare] Target image too large:", targetFile.originalname);
+          return res.status(400).json({ 
+            error: "Target image size exceeds 5MB limit",
+            details: { 
+              targetName: targetFile.originalname,
+              targetSize: targetFile.size, 
+              maxAllowed: MAX_IMAGE_SIZE 
+            }
+          });
+        }
+
+        if (targetFile.size < MIN_IMAGE_SIZE) {
+          console.error("[BatchCompare] Target image too small:", targetFile.originalname);
+          return res.status(400).json({ 
+            error: "Target image size below minimum threshold",
+            details: { 
+              targetName: targetFile.originalname,
+              targetSize: targetFile.size, 
+              minRequired: MIN_IMAGE_SIZE 
+            }
+          });
+        }
+      }
+
+      // Validate MIME types
+      const validMimeTypes = ['image/jpeg', 'image/png'];
+      if (!validMimeTypes.includes(sourceFile.mimetype)) {
+        console.error("[BatchCompare] Invalid source MIME type:", sourceFile.mimetype);
+        return res.status(400).json({ 
+          error: "Invalid source image format",
+          details: { sourceMimeType: sourceFile.mimetype, allowedTypes: validMimeTypes }
+        });
+      }
+
+      for (const targetFile of targetFiles) {
+        if (!validMimeTypes.includes(targetFile.mimetype)) {
+          console.error("[BatchCompare] Invalid target MIME type:", targetFile.mimetype);
+          return res.status(400).json({ 
+            error: "Invalid target image format",
+            details: { 
+              targetName: targetFile.originalname,
+              targetMimeType: targetFile.mimetype, 
+              allowedTypes: validMimeTypes 
+            }
+          });
+        }
+      }
+
+      // Detect faces in source image first
+      if (Controls.enableDebugLogBatchCompare) {
+        console.log("\n[BatchCompare] Detecting faces in source image...");
+      }
+      
+      const sourceFaces = await detectFacesInImage(sourceFile.buffer, sourceFile.originalname);
+      
+      if (!sourceFaces || sourceFaces.length === 0) {
+        console.error("[BatchCompare] No faces detected in source image");
+        return res.status(400).json({
+          error: "No faces detected in source image",
+          details: {
+            imageName: sourceFile.originalname,
+            imageSize: sourceFile.size,
+            imageType: sourceFile.mimetype
+          }
+        });
+      }
+
+      if (Controls.enableDebugLogBatchCompare) {
+        console.log(`[BatchCompare] Found ${sourceFaces.length} faces in source image`);
+        console.log("\n[BatchCompare] Starting parallel face comparisons...");
+      }
+
+      // Process all target images in parallel
+      const comparisonPromises = targetFiles.map(async (targetFile) => {
+        // Detect faces in target image
+        const targetFaces = await detectFacesInImage(targetFile.buffer, targetFile.originalname);
+        
+        if (!targetFaces || targetFaces.length === 0) {
+          if (Controls.enableDebugLogBatchCompare) {
+            console.log(`[BatchCompare] ⚠️  No faces detected in ${targetFile.originalname}`);
+          }
+          return {
+            targetFileName: targetFile.originalname,
+            success: false,
+            FaceMatches: [],
+            UnmatchedFaces: [],
+            sourceFaceCount: sourceFaces.length,
+            targetFaceCount: 0,
+            error: "No faces detected in target image"
+          };
+        }
+
+        // Compare faces
+        const comparisonResult = await compareFaces(
+          sourceFile.buffer, 
+          targetFile.buffer, 
+          sourceFile.originalname, 
+          targetFile.originalname
+        );
+
+        return {
+          targetFileName: targetFile.originalname,
+          success: comparisonResult.success,
+          FaceMatches: comparisonResult.FaceMatches,
+          UnmatchedFaces: comparisonResult.UnmatchedFaces,
+          sourceFaceCount: sourceFaces.length,
+          targetFaceCount: targetFaces.length,
+          error: comparisonResult.error
+        };
+      });
+
+      // Wait for all comparisons to complete
+      const results = await Promise.all(comparisonPromises);
+      
+      // Calculate summary statistics
+      const successfulComparisons = results.filter(r => r.success).length;
+      const failedComparisons = results.filter(r => !r.success).length;
+      const totalMatches = results.reduce((sum, r) => sum + r.FaceMatches.length, 0);
+
+      if (Controls.enableDebugLogBatchCompare) {
+        console.log("\n[BatchCompare] Summary:");
+        console.log(`- Total processed: ${results.length}`);
+        console.log(`- Successful: ${successfulComparisons}`);
+        console.log(`- Failed: ${failedComparisons}`);
+        console.log(`- Total face matches: ${totalMatches}`);
+        console.log("\n=== Batch Face Comparison Request Completed Successfully ===\n");
+      }
+
+      res.json({
+        results,
+        totalProcessed: results.length,
+        successfulComparisons,
+        failedComparisons,
+        totalMatches,
+        sourceFaceCount: sourceFaces.length
+      });
+
+    } catch (err) {
+      console.error("\n=== Batch Face Comparison Error ===");
+      console.error("Error Type:", err.name);
+      console.error("Error Message:", err.message);
+      console.error("Error Stack:", err.stack);
+      
+      if (err.$metadata) {
+        console.error("\nAWS Error Metadata:");
+        console.error("- Request ID:", err.$metadata.requestId);
+        console.error("- HTTP Status Code:", err.$metadata.httpStatusCode);
+        console.error("- Attempts:", err.$metadata.attempts);
+      }
+      
+      const errorResponse = {
+        error: err.message,
+        type: err.name,
+        details: {
+          timestamp: new Date().toISOString(),
+          requestId: err.$metadata?.requestId,
+          statusCode: err.$metadata?.httpStatusCode
+        }
+      };
+      
+      console.error("\n=== End Batch Comparison Error Details ===\n");
+      res.status(500).json(errorResponse);
     }
   }
 );

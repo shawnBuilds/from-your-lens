@@ -4,6 +4,7 @@ import Photos
 struct PhotoItemView: View {
     let photo: Photo
     let cellSize: CGFloat
+    @EnvironmentObject var appState: AppState
     
     var body: some View {
         ZStack {
@@ -81,6 +82,32 @@ struct PhotoItemView: View {
         }
         .frame(width: cellSize, height: cellSize)
         .accessibilityLabel(photo.altText ?? "Photo")
+        .overlay(
+            // Download button for S3 photos
+            Group {
+                if let s3Url = photo.s3Url, !s3Url.isEmpty {
+                    VStack {
+                        Spacer()
+                        HStack {
+                            Spacer()
+                            Button(action: {
+                                Task {
+                                    await appState.downloadSinglePhotoToLibrary(photo)
+                                }
+                            }) {
+                                Image(systemName: "arrow.down.circle.fill")
+                                    .foregroundColor(.white)
+                                    .font(.system(size: 20))
+                                    .background(Color.black.opacity(0.6))
+                                    .clipShape(Circle())
+                            }
+                            .buttonStyle(.plain)
+                            .padding(4)
+                        }
+                    }
+                }
+            }
+        )
     }
 }
 

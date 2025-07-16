@@ -4,6 +4,7 @@ import Foundation
 protocol FaceApiServiceProtocol {
     func detectFacesWithApi(imageData: Data) async throws -> FaceDetectionResult
     func compareFacesWithApi(sourceImageData: Data, targetImageData: Data) async throws -> FaceComparisonResult
+    func batchCompareFacesWithApi(sourceImageData: Data, targetImageDataArray: [Data]) async throws -> BatchCompareResponse
 }
 
 class FaceApiService: FaceApiServiceProtocol {
@@ -140,6 +141,111 @@ class FaceApiService: FaceApiServiceProtocol {
             return FaceComparisonResult.mockError
         }
     }
+    
+    func batchCompareFacesWithApi(sourceImageData: Data, targetImageDataArray: [Data]) async throws -> BatchCompareResponse {
+        // Check if face detection is enabled
+        if !FeatureFlags.enableFaceDetectionUsage {
+            return BatchCompareResponse.mockResponse
+        }
+        
+        // Validate source image data size
+        guard sourceImageData.count >= FeatureFlags.minImageSizeForFaceDetection else {
+            return BatchCompareResponse.mockError
+        }
+        
+        guard sourceImageData.count <= FeatureFlags.maxImageSizeForFaceDetection else {
+            return BatchCompareResponse.mockError
+        }
+        
+        // Validate target images
+        guard !targetImageDataArray.isEmpty else {
+            return BatchCompareResponse.mockError
+        }
+        
+        guard targetImageDataArray.count <= 20 else {
+            return BatchCompareResponse.mockError
+        }
+        
+        for targetImageData in targetImageDataArray {
+            guard targetImageData.count >= FeatureFlags.minImageSizeForFaceDetection else {
+                return BatchCompareResponse.mockError
+            }
+            
+            guard targetImageData.count <= FeatureFlags.maxImageSizeForFaceDetection else {
+                return BatchCompareResponse.mockError
+            }
+        }
+        
+        do {
+            let url = URL(string: "\(baseURL)/api/face/batch-compare")!
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            
+            // Create multipart form data
+            let boundary = UUID().uuidString
+            request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+            
+            var body = Data()
+            
+            // Add source image data
+            body.append("--\(boundary)\r\n".data(using: .utf8)!)
+            body.append("Content-Disposition: form-data; name=\"source\"; filename=\"source.jpg\"\r\n".data(using: .utf8)!)
+            body.append("Content-Type: image/jpeg\r\n\r\n".data(using: .utf8)!)
+            body.append(sourceImageData)
+            body.append("\r\n".data(using: .utf8)!)
+            
+            // Add all target image data
+            for (index, targetImageData) in targetImageDataArray.enumerated() {
+                body.append("--\(boundary)\r\n".data(using: .utf8)!)
+                body.append("Content-Disposition: form-data; name=\"targets\"; filename=\"target\(index).jpg\"\r\n".data(using: .utf8)!)
+                body.append("Content-Type: image/jpeg\r\n\r\n".data(using: .utf8)!)
+                body.append(targetImageData)
+                body.append("\r\n".data(using: .utf8)!)
+            }
+            
+            body.append("--\(boundary)--\r\n".data(using: .utf8)!)
+            
+            request.httpBody = body
+            
+            if FeatureFlags.enableDebugLogBatchCompare {
+                print("[FaceApiService] Sending batch compare request with \(targetImageDataArray.count) target images")
+            }
+            
+            let (data, response) = try await session.data(for: request)
+            
+            guard let httpResponse = response as? HTTPURLResponse else {
+                return BatchCompareResponse.mockError
+            }
+            
+            guard httpResponse.statusCode == 200 else {
+                if FeatureFlags.enableDebugLogBatchCompare {
+                    print("[FaceApiService] Batch compare failed with status code: \(httpResponse.statusCode)")
+                }
+                return BatchCompareResponse.mockError
+            }
+            
+            let decoder = JSONDecoder()
+            let batchResponse = try decoder.decode(BatchCompareAPIResponse.self, from: data)
+            
+            if FeatureFlags.enableDebugLogBatchCompare {
+                print("[FaceApiService] Batch compare completed: \(batchResponse.successfulComparisons) successful, \(batchResponse.failedComparisons) failed")
+            }
+            
+            return BatchCompareResponse(
+                results: batchResponse.results,
+                totalProcessed: batchResponse.totalProcessed,
+                successfulComparisons: batchResponse.successfulComparisons,
+                failedComparisons: batchResponse.failedComparisons,
+                error: nil
+            )
+            
+        } catch {
+            if FeatureFlags.enableDebugLogBatchCompare {
+                print("[FaceApiService] Batch compare error: \(error)")
+            }
+            return BatchCompareResponse.mockError
+        }
+    }
 }
 
 // MARK: - API Response Structures
@@ -148,6 +254,15 @@ struct FaceComparisonAPIResponse: Codable {
     let UnmatchedFaces: [FaceDetail]?
     let sourceFaceCount: Int
     let targetFaceCount: Int
+}
+
+struct BatchCompareAPIResponse: Codable {
+    let results: [BatchCompareResult]
+    let totalProcessed: Int
+    let successfulComparisons: Int
+    let failedComparisons: Int
+    let totalMatches: Int
+    let sourceFaceCount: Int
 }
 
 // MARK: - Face API Service Errors

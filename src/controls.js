@@ -14,6 +14,7 @@ const Controls = {
     // Development Controls - Specific debug flags to reduce console noise
     enableDebugLogOAuth: true,        // Google OAuth flow logs
     enableDebugLogFaceDetection: false, // Face detection/comparison logs
+    enableDebugLogBatchCompare: true, // Batch face comparison logs (NEW)
     enableDebugLogPhotoUpload: true, // Debug: log photo upload operations
     enableDebugLogAuth: true,         // General auth service logs
     enableDebugLogUser: true,         // User management logs

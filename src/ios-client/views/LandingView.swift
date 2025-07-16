@@ -215,18 +215,10 @@ struct LandingView: View {
                         }
                         // How it works section
                         if FeatureFlags.enableLandingHowItWorks {
-                            // Calculate dynamic width for each card (now for vertical stack, use maxWidth)
-                            let horizontalPadding: CGFloat = 20 // match .padding(.horizontal, 20) on VStack
-                            VStack(spacing: 16) {
-                                ForEach(howItWorksSteps) { step in
-                                    HowItWorksStepView(
-                                        step: step,
+                            HowItWorksSection(
+                                steps: howItWorksSteps,
                                         loadingState: $loadingState
                                     )
-                                    .frame(maxWidth: .infinity, minHeight: 60, maxHeight: 130)
-                                }
-                            }
-                            .padding(.horizontal, horizontalPadding)
                             .frame(maxWidth: geometry.size.width - 40)
                             .padding(.top, 8)
                             .background(
@@ -497,66 +489,7 @@ struct GalleryCardView: View {
     }
 }
 
-struct HowItWorksStep: Identifiable {
-    let id = UUID()
-    let iconUrl: String
-    let text: String
-    let bold: String?
-    init(iconUrl: String, text: String, bold: String? = nil) {
-        self.iconUrl = iconUrl
-        self.text = text
-        self.bold = bold
-    }
-}
 
-struct HowItWorksStepView: View {
-    let step: HowItWorksStep
-    @Binding var loadingState: LandingViewLoadingState
-    
-    var body: some View {
-        HStack(spacing: 18) {
-            AsyncImage(url: URL(string: step.iconUrl)) { phase in
-                switch phase {
-                case .empty:
-                    Color.gray.frame(width: 32, height: 32)
-                        .onAppear {
-                            loadingState.setHowItWorksIconLoading(step.iconUrl, isLoading: true)
-                        }
-                case .success(let img):
-                    img.resizable()
-                        .frame(width: 32, height: 32)
-                        .onAppear {
-                            loadingState.setHowItWorksIconLoading(step.iconUrl, isLoading: false)
-                        }
-                case .failure:
-                    Color.gray.frame(width: 32, height: 32)
-                        .onAppear {
-                            loadingState.setHowItWorksIconLoading(step.iconUrl, isLoading: false)
-                        }
-                @unknown default:
-                    Color.gray.frame(width: 32, height: 32)
-                }
-            }
-            if let bold = step.bold {
-                (
-                    Text(step.text).foregroundColor(.textColorPrimary) +
-                    Text(bold).bold().foregroundColor(.textColorPrimary)
-                )
-            } else {
-                Text(step.text).foregroundColor(.textColorPrimary)
-            }
-        }
-        .padding(.horizontal, 18)
-        .frame(height: 64)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.secondaryColor)
-        .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(Color.textColorPrimary, lineWidth: 2)
-        )
-        .cornerRadius(16)
-    }
-}
 
 #Preview {
     LandingView().environmentObject(AppState())

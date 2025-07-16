@@ -42,6 +42,12 @@ class AppState: ObservableObject {
     @Published var selectedTargetUser: User?
     @Published var batchCompareMode: BatchCompareMode = .findPhotos
     
+    // MARK: - Photo Download State
+    @Published var isDownloadingPhotos: Bool = false
+    @Published var downloadProgress: Double = 0.0
+    @Published var downloadResult: PhotoDownloadResult?
+    @Published var downloadError: Error?
+    
     // MARK: - Private Properties
     private var cancellables = Set<AnyCancellable>()
     private let authService = AuthService()
@@ -49,6 +55,7 @@ class AppState: ObservableObject {
     private let userService = UserService()
     private let photosService = PhotosService()
     private let faceApiService = FaceApiService()
+    private let photoDownloadService = PhotoDownloadService()
     
     // MARK: - Initialization
     init() {
@@ -211,6 +218,12 @@ class AppState: ObservableObject {
         
         // Reset available tags
         availableTags = []
+        
+        // Reset download state
+        isDownloadingPhotos = false
+        downloadProgress = 0.0
+        downloadResult = nil
+        downloadError = nil
         
         currentUser = nil
         currentView = .landing
@@ -395,88 +408,68 @@ class AppState: ObservableObject {
                 return
             }
             
-            var allResults: [BatchCompareResult] = []
-            var successfulComparisons = 0
-            var failedComparisons = 0
+            // Convert all target photos to image data
+            var targetImageDataArray: [Data] = []
+            var validTargetPhotos: [Photo] = []
             
             for (index, targetPhoto) in targetPhotos.enumerated() {
-                matchesAttempted = index + 1
                 if FeatureFlags.enableDebugLogFaceDetection {
-                    print("[AppState] 🔍 Comparing target \(index + 1)/\(targetPhotos.count): \(targetPhoto.mediaItemId)")
-                    print("[AppState] Target photo details:")
-                    print("  - ID: \(targetPhoto.id)")
-                    print("  - URL: \(targetPhoto.baseUrl)")
-                    print("  - User ID: \(targetPhoto.userId)")
-                    print("  - Creation time: \(targetPhoto.creationTime?.description ?? "nil")")
+                    print("[AppState] 🔍 Converting target \(index + 1)/\(targetPhotos.count): \(targetPhoto.mediaItemId)")
                 }
                 
-                do {
-                    // Convert target photo to image data
-                    guard let targetImageData = await convertPhotoToImageData(targetPhoto) else {
-                        if FeatureFlags.enableDebugBatchCompareModal {
-                            print("[BatchCompareModal] Failed to load target image data for: \(targetPhoto.mediaItemId)")
-                            print("[BatchCompareModal] Target photo URL: \(targetPhoto.baseUrl)")
-                        }
-                        let errorResult = BatchCompareResult(
-                            targetFileName: targetPhoto.mediaItemId,
-                            photo: targetPhoto,
-                            faceMatches: [],
-                            unmatchedFaces: [],
-                            sourceFaceCount: 0,
-                            targetFaceCount: 0,
-                            error: "Failed to load target image",
-                            rejected: true
-                        )
-                        allResults.append(errorResult)
-                        failedComparisons += 1
-                        
-                        // Update progress after each photo is processed (even if failed to load)
-                        let progress = Double(index + 1) / Double(targetPhotos.count)
-                        batchCompareProgress = progress
-                        
-                        continue
-                    }
-                    
-                    // Perform face comparison
-                    let comparisonResult = try await faceApiService.compareFacesWithApi(
-                        sourceImageData: sourceImageData,
-                        targetImageData: targetImageData
-                    )
-                    
+                guard let targetImageData = await convertPhotoToImageData(targetPhoto) else {
                     if FeatureFlags.enableDebugBatchCompareModal {
-                        print("[BatchCompareModal] Creating batch result for: \(targetPhoto.mediaItemId)")
-                        print("[BatchCompareModal] Photo URL: \(targetPhoto.baseUrl)")
-                        print("[BatchCompareModal] Face matches: \(comparisonResult.faceMatches.count)")
+                        print("[BatchCompareModal] Failed to load target image data for: \(targetPhoto.mediaItemId)")
                     }
-                    
-                    let batchResult = BatchCompareResult(
-                        targetFileName: targetPhoto.mediaItemId,
-                        photo: targetPhoto,
-                        faceMatches: comparisonResult.faceMatches,
-                        unmatchedFaces: comparisonResult.unmatchedFaces,
-                        sourceFaceCount: comparisonResult.sourceFaceCount,
-                        targetFaceCount: comparisonResult.targetFaceCount,
-                        error: comparisonResult.error,
-                        rejected: false
-                    )
-                    
-                    allResults.append(batchResult)
-                    
-                    if comparisonResult.error == nil {
-                        successfulComparisons += 1
-                    } else {
-                        failedComparisons += 1
-                    }
-                    
-                    // Update progress after each photo is processed
-                    let progress = Double(index + 1) / Double(targetPhotos.count)
-                    batchCompareProgress = progress
-                    
-                } catch {
-                    if FeatureFlags.enableDebugLogFaceDetection {
-                        print("[AppState] Error comparing with target \(targetPhoto.mediaItemId): \(error)")
-                    }
-                    
+                    continue
+                }
+                
+                targetImageDataArray.append(targetImageData)
+                validTargetPhotos.append(targetPhoto)
+            }
+            
+            guard !targetImageDataArray.isEmpty else {
+                batchCompareError = "Failed to load any target images"
+                batchCompareState = .error
+                isBatchComparing = false
+                return
+            }
+            
+            if FeatureFlags.enableDebugLogFaceDetection {
+                print("[AppState] Prepared \(targetImageDataArray.count) target images for batch processing")
+            }
+            
+            // Perform batch face comparison
+            let batchResponse = try await faceApiService.batchCompareFacesWithApi(
+                sourceImageData: sourceImageData,
+                targetImageDataArray: targetImageDataArray
+            )
+            
+            // Map results back to photos
+            var allResults: [BatchCompareResult] = []
+            
+            for (index, result) in batchResponse.results.enumerated() {
+                guard index < validTargetPhotos.count else { break }
+                
+                let targetPhoto = validTargetPhotos[index]
+                
+                let batchResult = BatchCompareResult(
+                    targetFileName: result.targetFileName,
+                    photo: targetPhoto,
+                    faceMatches: result.faceMatches,
+                    unmatchedFaces: result.unmatchedFaces,
+                    sourceFaceCount: result.sourceFaceCount,
+                    targetFaceCount: result.targetFaceCount,
+                    error: result.error,
+                    rejected: false
+                )
+                
+                allResults.append(batchResult)
+            }
+            
+            // Add error results for photos that couldn't be converted
+            for targetPhoto in targetPhotos {
+                if !validTargetPhotos.contains(where: { $0.id == targetPhoto.id }) {
                     let errorResult = BatchCompareResult(
                         targetFileName: targetPhoto.mediaItemId,
                         photo: targetPhoto,
@@ -484,16 +477,10 @@ class AppState: ObservableObject {
                         unmatchedFaces: [],
                         sourceFaceCount: 0,
                         targetFaceCount: 0,
-                        error: error.localizedDescription,
-                        rejected: false
+                        error: "Failed to load target image",
+                        rejected: true
                     )
                     allResults.append(errorResult)
-                    failedComparisons += 1
-                    
-                    // Update progress after error
-                    let progress = Double(index + 1) / Double(targetPhotos.count)
-                    batchCompareProgress = progress
-                    
                 }
             }
             
@@ -501,18 +488,18 @@ class AppState: ObservableObject {
             batchCompareResults = allResults
             
             if FeatureFlags.enableDebugLogFaceDetection {
-                print("[AppState] Batch compare completed: \(successfulComparisons) successful, \(failedComparisons) failed")
+                print("[AppState] Batch compare completed: \(batchResponse.successfulComparisons) successful, \(batchResponse.failedComparisons) failed")
             }
             
             // Set error message if all comparisons failed
-            if failedComparisons == targetPhotos.count && targetPhotos.count > 0 {
+            if batchResponse.failedComparisons == targetPhotos.count && targetPhotos.count > 0 {
                 batchCompareError = "All \(targetPhotos.count) image comparisons failed"
                 batchCompareState = .error
                 if FeatureFlags.enableDebugBatchCompareModal {
                     print("[BatchCompareModal] State transition: MATCHING → ERROR (all failed)")
                 }
-            } else if failedComparisons > 0 {
-                batchCompareError = "\(failedComparisons) of \(targetPhotos.count) comparisons had issues"
+            } else if batchResponse.failedComparisons > 0 {
+                batchCompareError = "\(batchResponse.failedComparisons) of \(targetPhotos.count) comparisons had issues"
                 batchCompareState = .matched
                 if FeatureFlags.enableDebugBatchCompareModal {
                     print("[BatchCompareModal] State transition: MATCHING → MATCHED (partial success)")
@@ -858,6 +845,111 @@ class AppState: ObservableObject {
                 print("[AppState] Error converting photo to image data: \(error)")
             }
             return nil
+        }
+    }
+    
+    // MARK: - Photo Download Methods
+    func downloadPhotosOfYouToLibrary() async {
+        guard !photosOfYou.isEmpty else {
+            if FeatureFlags.enableDebugLogPhotoDownload {
+                print("[AppState] No photos of you to download")
+            }
+            return
+        }
+        
+        // Filter to only S3 photos
+        let s3Photos = photosOfYou.filter { $0.s3Url != nil && !$0.s3Url!.isEmpty }
+        
+        guard !s3Photos.isEmpty else {
+            if FeatureFlags.enableDebugLogPhotoDownload {
+                print("[AppState] No S3 photos found in photos of you")
+            }
+            return
+        }
+        
+        if FeatureFlags.enableDebugLogPhotoDownload {
+            print("[AppState] Starting download of \(s3Photos.count) S3 photos to library")
+        }
+        
+        isDownloadingPhotos = true
+        downloadProgress = 0.0
+        downloadResult = nil
+        downloadError = nil
+        
+        do {
+            let result = try await photoDownloadService.downloadMultiplePhotosToLibrary(s3Photos)
+            
+            await MainActor.run {
+                self.downloadResult = result
+                self.downloadProgress = 1.0
+                self.isDownloadingPhotos = false
+            }
+            
+            if FeatureFlags.enableDebugLogPhotoDownload {
+                print("[AppState] Download completed: \(result.summary)")
+            }
+            
+        } catch {
+            await MainActor.run {
+                self.downloadError = error
+                self.isDownloadingPhotos = false
+            }
+            
+            if FeatureFlags.enableDebugLogPhotoDownload {
+                print("[AppState] Download failed: \(error)")
+            }
+        }
+    }
+    
+    func downloadSinglePhotoToLibrary(_ photo: Photo) async {
+        guard let s3Url = photo.s3Url, !s3Url.isEmpty else {
+            if FeatureFlags.enableDebugLogPhotoDownload {
+                print("[AppState] Photo is not an S3 photo: \(photo.mediaItemId)")
+            }
+            return
+        }
+        
+        if FeatureFlags.enableDebugLogPhotoDownload {
+            print("[AppState] Starting download of single photo: \(photo.mediaItemId)")
+        }
+        
+        isDownloadingPhotos = true
+        downloadProgress = 0.0
+        downloadResult = nil
+        downloadError = nil
+        
+        do {
+            let success = try await photoDownloadService.downloadPhotoToLibrary(photo)
+            
+            await MainActor.run {
+                self.downloadProgress = 1.0
+                self.isDownloadingPhotos = false
+                
+                if success {
+                    self.downloadResult = PhotoDownloadResult(
+                        success: true,
+                        downloadedCount: 1,
+                        failedCount: 0,
+                        errors: []
+                    )
+                } else {
+                    self.downloadError = PhotoDownloadServiceError.saveFailed
+                }
+            }
+            
+            if FeatureFlags.enableDebugLogPhotoDownload {
+                print("[AppState] Single photo download completed: \(success)")
+            }
+            
+        } catch {
+            await MainActor.run {
+                self.downloadError = error
+                self.isDownloadingPhotos = false
+            }
+            
+            if FeatureFlags.enableDebugLogPhotoDownload {
+                print("[AppState] Single photo download failed: \(error)")
+            }
         }
     }
     

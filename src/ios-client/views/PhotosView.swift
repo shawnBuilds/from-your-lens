@@ -5,6 +5,7 @@ struct PhotosView: View {
     @State private var selectedTab: PhotoTabType = .allPhotos
     @State private var showingProfilePicturePicker = false
     @State private var hasPromptedForProfilePicture = false
+    @State private var showingInviteFriendsModal = false
     
     var filteredPhotos: [Photo] {
         switch selectedTab {
@@ -83,6 +84,18 @@ struct PhotosView: View {
                 }
             }
             Divider()
+            // Move action buttons row above tabs row
+            MatchingTabsView(
+                onFindPhotos: {
+                    if FeatureFlags.showCompareModalOnFindPhotosClick {
+                        appState.isBatchCompareModalPresented = true
+                    } else {
+                        showingInviteFriendsModal = true
+                    }
+                },
+                onSendPhotos: {}
+            )
+            .padding(.vertical, 12)
             // Photo navigation tabs
             PhotoTabsView(
                 selectedTab: $selectedTab,
@@ -100,20 +113,69 @@ struct PhotosView: View {
                 hasMore: selectedTab == .allPhotos ? appState.hasMorePhotos : appState.hasMorePhotosOfYou,
                 emptyMessage: emptyMessage
             )
+            
+            // Download all button for Photos of You tab
+            if selectedTab == .photosOfYou && !filteredPhotos.isEmpty {
+                let s3Photos = filteredPhotos.filter { $0.s3Url != nil && !$0.s3Url!.isEmpty }
+                if !s3Photos.isEmpty {
+                    VStack(spacing: 8) {
+                        Button(action: {
+                            Task {
+                                await appState.downloadPhotosOfYouToLibrary()
+                            }
+                        }) {
+                            HStack {
+                                if appState.isDownloadingPhotos {
+                                    ProgressView()
+                                        .scaleEffect(0.8)
+                                        .foregroundColor(.white)
+                                } else {
+                                    Image(systemName: "arrow.down.circle.fill")
+                                        .foregroundColor(.white)
+                                }
+                                Text(appState.isDownloadingPhotos ? "Downloading..." : "Download All Photos")
+                                    .foregroundColor(.white)
+                                    .font(.system(size: 16, weight: .medium))
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .background(Color.primaryColor)
+                            .cornerRadius(20)
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(appState.isDownloadingPhotos)
+                        
+                        // Show download result
+                        if let result = appState.downloadResult {
+                            Text(result.summary)
+                                .font(.caption)
+                                .foregroundColor(.textColorSecondary)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal)
+                        }
+                        
+                        // Show download error
+                        if let error = appState.downloadError {
+                            Text("Download failed: \(error.localizedDescription)")
+                                .font(.caption)
+                                .foregroundColor(.red)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal)
+                        }
+                    }
+                    .padding(.vertical, 8)
+                }
+            }
             Spacer(minLength: 0)
-            // Matching action buttons at the bottom
-            MatchingTabsView(
-                onFindPhotos: {
-                    appState.isBatchCompareModalPresented = true
-                },
-                onSendPhotos: {}
-            )
-            .padding(.vertical, 12)
         }
         .background(Color.secondaryColor)
         .edgesIgnoringSafeArea(.bottom)
         .sheet(isPresented: $appState.isBatchCompareModalPresented) {
             BatchCompareModal(isPresented: $appState.isBatchCompareModalPresented)
+                .environmentObject(appState)
+        }
+        .sheet(isPresented: $showingInviteFriendsModal) {
+            InviteFriendsModal(isPresented: $showingInviteFriendsModal)
                 .environmentObject(appState)
         }
         .sheet(isPresented: $showingProfilePicturePicker) {

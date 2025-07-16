@@ -38,29 +38,53 @@ struct GoldActionButton: View {
     let action: () -> Void
     @State private var isPressed = false
     
+    var goldGradient: LinearGradient {
+        LinearGradient(
+            gradient: Gradient(colors: [Color.primaryColor, Color.primaryColorDark]),
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+    
     var body: some View {
         Button(action: action) {
             HStack {
                 Spacer(minLength: 0)
                 Text(label)
-                    .fontWeight(.semibold)
+                    .font(.system(size: 18, weight: .semibold, design: .rounded))
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: .infinity)
                 Spacer(minLength: 0)
             }
-            .foregroundColor(isPressed ? Color.primaryColor : .white)
+            .foregroundColor(.white)
             .frame(height: 54)
-            .background(isPressed ? Color.white : Color.primaryColor)
-            .cornerRadius(22)
-            .shadow(color: Color.neumorphicShadow.opacity(0.18), radius: 4, x: 0, y: 2)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 4)
+            .background(
+                Group {
+                    if isPressed {
+                        goldGradient.opacity(0.7)
+                    } else {
+                        goldGradient
+                    }
+                }
+            )
+            .cornerRadius(14)
+            .shadow(color: Color.neumorphicShadow.opacity(isPressed ? 0.10 : 0.18), radius: isPressed ? 2 : 6, x: 0, y: isPressed ? 1 : 3)
+            .scaleEffect(isPressed ? 0.97 : 1.0)
+            .animation(.spring(response: 0.18, dampingFraction: 0.7), value: isPressed)
             .frame(minWidth: 0, maxWidth: .infinity)
         }
         .buttonStyle(.plain)
-        .onLongPressGesture(minimumDuration: 0.01, pressing: { pressing in
-            withAnimation(.easeInOut(duration: 0.12)) {
-                isPressed = pressing
-            }
-        }, perform: {})
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { _ in
+                    if !isPressed { isPressed = true }
+                }
+                .onEnded { _ in
+                    isPressed = false
+                }
+        )
     }
 }
 

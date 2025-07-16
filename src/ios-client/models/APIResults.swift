@@ -61,6 +61,23 @@ struct BatchCompareResponse {
     let successfulComparisons: Int
     let failedComparisons: Int
     let error: String?
+    
+    // MARK: - Mock Responses
+    static let mockResponse = BatchCompareResponse(
+        results: [],
+        totalProcessed: 0,
+        successfulComparisons: 0,
+        failedComparisons: 0,
+        error: nil
+    )
+    
+    static let mockError = BatchCompareResponse(
+        results: [],
+        totalProcessed: 0,
+        successfulComparisons: 0,
+        failedComparisons: 0,
+        error: "Mock error response"
+    )
 }
 
 struct FaceDetail: Codable {

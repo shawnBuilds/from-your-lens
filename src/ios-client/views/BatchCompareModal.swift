@@ -99,10 +99,10 @@ struct BatchCompareModal: View {
                 set: { photos in
                     selectedSourcePhoto = photos.first
                 }
-            ), maxSelection: 1, title: "Choose Source Photo")
+            ), maxSelection: FeatureFlags.maxSourcePhotoSelection, title: "Choose Source Photo")
         }
         .sheet(isPresented: $showingTargetPhotoPicker) {
-            PhotoPickerView(selectedPhotos: $selectedTargetPhotos, maxSelection: 10, title: "Choose Target Photos")
+            PhotoPickerView(selectedPhotos: $selectedTargetPhotos, maxSelection: FeatureFlags.maxTargetPhotoSelection, title: "Choose Target Photos")
         }
         .sheet(isPresented: $showingProfilePicturePicker) {
             ProfilePicturePickerModal(
