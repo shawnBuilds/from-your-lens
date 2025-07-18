@@ -185,6 +185,7 @@ struct PhotosView: View {
                 isAutoPrompt: true
             )
         }
+
         .onAppear {
             if FeatureFlags.enableDebugLogICloudPhotos {
                 print("[DEBUG][PhotosView] PhotosView appeared")
@@ -220,28 +221,20 @@ struct PhotosView: View {
             }
         }
         .onChange(of: selectedTab) { newTab in
-            if FeatureFlags.enableDebugLogServerPhotos {
-                print("[DEBUG][PhotosView] 🔄 Tab changed to: \(newTab.rawValue)")
-                print("[DEBUG][PhotosView] 📊 Current state - photosOfYou.count: \(appState.photosOfYou.count), isFetchingPhotosOfYou: \(appState.isFetchingPhotosOfYou), photosOfYouInitialFetchComplete: \(appState.photosOfYouInitialFetchComplete)")
-            }
-            
-            if newTab == .photosOfYou && appState.photosOfYou.isEmpty && !appState.isFetchingPhotosOfYou && !appState.photosOfYouInitialFetchComplete {
-                if FeatureFlags.enableDebugLogServerPhotos {
-                    print("[DEBUG][PhotosView] ✅ All conditions met! Triggering fetchInitialPhotosOfUser")
-                }
-                Task {
-                    await appState.fetchInitialPhotosOfUser()
-                }
-            } else if newTab == .photosOfYou {
-                if FeatureFlags.enableDebugLogServerPhotos {
-                    print("[DEBUG][PhotosView] ❌ Conditions NOT met for fetchInitialPhotosOfUser:")
-                    print("  - photosOfYou.isEmpty: \(appState.photosOfYou.isEmpty)")
-                    print("  - !isFetchingPhotosOfYou: \(!appState.isFetchingPhotosOfYou)")
-                    print("  - !photosOfYouInitialFetchComplete: \(!appState.photosOfYouInitialFetchComplete)")
-                }
+            handleTabChange(newTab)
+        }
+    }
+    
+    // MARK: - Private Methods
+    private func handleTabChange(_ newTab: PhotoTabType) {
+        if newTab == .photosOfYou && appState.photosOfYou.isEmpty && !appState.isFetchingPhotosOfYou && !appState.photosOfYouInitialFetchComplete {
+            Task {
+                await appState.fetchInitialPhotosOfUser()
             }
         }
     }
+    
+
 }
 
 #Preview {

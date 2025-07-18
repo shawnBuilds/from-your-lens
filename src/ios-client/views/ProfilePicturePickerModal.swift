@@ -38,12 +38,12 @@ struct ProfilePicturePickerModal: View {
                         .foregroundColor(.primaryColor)
                     
                     if isAutoPrompt {
-                        Text("Please set a profile picture to get started")
+                        Text("Upload a selfie so we know what you look like!")
                             .font(.subheadline)
                             .foregroundColor(.textColorSecondary)
                             .multilineTextAlignment(.center)
                     } else {
-                        Text("Choose a selfie for better face matching")
+                        Text("Upload a selfie so we can recognize your face in other photos")
                             .font(.subheadline)
                             .foregroundColor(.textColorSecondary)
                             .multilineTextAlignment(.center)
@@ -208,7 +208,7 @@ struct ProfilePicturePickerModal: View {
                                     Text("Choose from Library")
                                         .font(.headline)
                                         .foregroundColor(.primaryColor)
-                                    Text("Select a selfie from your photos")
+                                    Text("Pick a clear selfie for face recognition")
                                         .font(.caption)
                                         .foregroundColor(.textColorSecondary)
                                 }

@@ -10,7 +10,7 @@ struct MatchingTabsView: View {
     var body: some View {
         HStack(spacing: 20) {
             GoldActionButton(
-                label: "Find photos of me",
+                label: "Get photos of me",
                 action: {
                     appState.batchCompareMode = .findPhotos
                     onFindPhotos()

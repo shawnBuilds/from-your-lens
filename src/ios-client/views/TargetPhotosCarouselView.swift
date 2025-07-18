@@ -9,15 +9,5 @@ struct TargetPhotosCarouselView: View {
             BatchComparePhotoView(photo: currentPhoto, size: 220)
                 .id(currentPhoto.id)
         }
-        .onAppear {
-            if FeatureFlags.enableDebugBatchCompareModal {
-                print("[TargetPhotosCarouselView] onAppear: photos count=\(photos.count)")
-            }
-        }
-        .onChange(of: photos) { newPhotos in
-            if FeatureFlags.enableDebugBatchCompareModal {
-                print("[TargetPhotosCarouselView] photos changed: count=\(newPhotos.count)")
-            }
-        }
     }
 } 

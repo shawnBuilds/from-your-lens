@@ -44,6 +44,8 @@
 	<true/>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>FromYourLens needs access to your photo library to display your photos for the photo matching feature.</string>
+	<key>NSUserNotificationUsageDescription</key>
+	<string>FromYourLens sends notifications when face matching completes and photos are downloaded to your library.</string>
 	<key>GIDClientID</key>
 	<string>374611061345-5op1h3i3pp2a53jo7t71e705qvomg5m4.apps.googleusercontent.com</string>
 	<key>CFBundleURLTypes</key>

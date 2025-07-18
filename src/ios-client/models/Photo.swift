@@ -107,6 +107,28 @@ extension Photo {
         )
     }
     
+    // MARK: - Placeholder Helper for Batch Compare API
+    static func placeholder(for targetFileName: String) -> Photo {
+        return Photo(
+            id: -2, // Special ID for placeholder
+            mediaItemId: targetFileName,
+            userId: 0, // Will be replaced by actual user ID
+            photoOf: nil,
+            altText: "Photo from batch compare",
+            tags: ["batch-compare"],
+            baseUrl: "placeholder://\(targetFileName)",
+            mimeType: "image/jpeg",
+            width: 1920, // Default dimensions
+            height: 1080,
+            creationTime: Date(),
+            createdAt: Date(),
+            updatedAt: Date(),
+            s3Key: nil,
+            s3Url: nil,
+            sharedAt: nil
+        )
+    }
+    
     static let mockPhotos = [
         Photo(
             id: 1,

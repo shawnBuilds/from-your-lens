@@ -1,13 +1,20 @@
 import SwiftUI
+import UserNotifications
 
 @main
 struct FromYourLensApp: App {
     @StateObject private var appState = AppState()
+    @StateObject private var notificationDelegate = NotificationDelegate()
     
     var body: some Scene {
         WindowGroup {
             AppView()
                 .environmentObject(appState)
+                .environmentObject(notificationDelegate)
+                .onAppear {
+                    // Set up notification delegate
+                    UNUserNotificationCenter.current().delegate = notificationDelegate
+                }
         }
     }
 }
@@ -19,8 +26,6 @@ struct AppView: View {
         Group {
             if appState.isLoading {
                 LoadingView()
-            } else if FeatureFlags.showTestingFormOnStart && appState.currentUser == nil {
-                TestingFormView()
             } else if appState.currentUser != nil && appState.currentView == .photos {
                 PhotosView()
             } else if appState.currentView == .landing {

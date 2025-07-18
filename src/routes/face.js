@@ -453,12 +453,12 @@ router.post(
           }
           return {
             targetFileName: targetFile.originalname,
-            success: false,
+            success: true, // This is a successful comparison, just no faces found
             FaceMatches: [],
             UnmatchedFaces: [],
             sourceFaceCount: sourceFaces.length,
             targetFaceCount: 0,
-            error: "No faces detected in target image"
+            error: null // No error, just no faces detected
           };
         }
 

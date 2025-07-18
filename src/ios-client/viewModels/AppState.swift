@@ -375,6 +375,31 @@ class AppState: ObservableObject {
     }
     
     // MARK: - Batch Compare Methods
+    func startBatchCompareWithPermissionCheck(sourcePhoto: Photo, targetPhotos: [Photo]) async -> Bool {
+        // Check notification permission first
+        let center = UNUserNotificationCenter.current()
+        let settings = await center.notificationSettings()
+        
+        if FeatureFlags.enableDebugLogNotifications {
+            print("[AppState] Batch compare permission check - status: \(settings.authorizationStatus.rawValue)")
+        }
+        
+        // If notifications are disabled and we should show the modal, return false to indicate modal should be shown
+        if (settings.authorizationStatus == .denied || settings.authorizationStatus == .notDetermined) && FeatureFlags.enablePushNotifications && FeatureFlags.showNotificationPermissionModal {
+            if FeatureFlags.enableDebugLogNotifications {
+                print("[AppState] Notification permission needed, should show modal")
+            }
+            return false
+        }
+        
+        // Permission is granted or not needed, proceed with batch compare
+        if FeatureFlags.enableDebugLogNotifications {
+            print("[AppState] Notification permission OK, starting batch compare")
+        }
+        await startBatchCompare(sourcePhoto: sourcePhoto, targetPhotos: targetPhotos)
+        return true
+    }
+    
     func startBatchCompare(sourcePhoto: Photo, targetPhotos: [Photo]) async {
         guard !targetPhotos.isEmpty else {
             batchCompareError = "No target photos selected"
@@ -417,9 +442,9 @@ class AppState: ObservableObject {
                     print("[AppState] 🔍 Converting target \(index + 1)/\(targetPhotos.count): \(targetPhoto.mediaItemId)")
                 }
                 
-                guard let targetImageData = await convertPhotoToImageData(targetPhoto) else {
-                    if FeatureFlags.enableDebugBatchCompareModal {
-                        print("[BatchCompareModal] Failed to load target image data for: \(targetPhoto.mediaItemId)")
+                    guard let targetImageData = await convertPhotoToImageData(targetPhoto) else {
+                        if FeatureFlags.enableDebugBatchCompareModal {
+                            print("[BatchCompareModal] Failed to load target image data for: \(targetPhoto.mediaItemId)")
                     }
                     continue
                 }
@@ -437,11 +462,11 @@ class AppState: ObservableObject {
             
             if FeatureFlags.enableDebugLogFaceDetection {
                 print("[AppState] Prepared \(targetImageDataArray.count) target images for batch processing")
-            }
-            
+                    }
+                    
             // Perform batch face comparison
             let batchResponse = try await faceApiService.batchCompareFacesWithApi(
-                sourceImageData: sourceImageData,
+                        sourceImageData: sourceImageData,
                 targetImageDataArray: targetImageDataArray
             )
             
@@ -453,18 +478,19 @@ class AppState: ObservableObject {
                 
                 let targetPhoto = validTargetPhotos[index]
                 
-                let batchResult = BatchCompareResult(
+                // Create a new BatchCompareResult with the actual photo object
+                    let batchResult = BatchCompareResult(
                     targetFileName: result.targetFileName,
-                    photo: targetPhoto,
+                    photo: targetPhoto, // Use the actual photo instead of placeholder
                     faceMatches: result.faceMatches,
                     unmatchedFaces: result.unmatchedFaces,
                     sourceFaceCount: result.sourceFaceCount,
                     targetFaceCount: result.targetFaceCount,
                     error: result.error,
-                    rejected: false
-                )
-                
-                allResults.append(batchResult)
+                    rejected: result.rejected
+                    )
+                    
+                    allResults.append(batchResult)
             }
             
             // Add error results for photos that couldn't be converted
@@ -489,26 +515,50 @@ class AppState: ObservableObject {
             
             if FeatureFlags.enableDebugLogFaceDetection {
                 print("[AppState] Batch compare completed: \(batchResponse.successfulComparisons) successful, \(batchResponse.failedComparisons) failed")
+                print("[AppState] Results breakdown:")
+                for (index, result) in allResults.enumerated() {
+                    print("  [\(index)] \(result.targetFileName): \(result.faceMatches.count) matches, error: \(result.error ?? "none")")
+                }
             }
             
-            // Set error message if all comparisons failed
-            if batchResponse.failedComparisons == targetPhotos.count && targetPhotos.count > 0 {
+            // Determine state based on results
+            let matchingResults = allResults.filter { !$0.faceMatches.isEmpty }
+            let hasAnyMatches = !matchingResults.isEmpty
+            
+            // Check if there were any actual technical failures (not just "no faces detected")
+            let technicalFailures = allResults.filter { $0.error != nil && $0.error != "No faces detected in target image" }
+            let hasTechnicalFailures = !technicalFailures.isEmpty
+            
+            if hasTechnicalFailures && technicalFailures.count == targetPhotos.count {
+                // All comparisons failed due to technical issues (API errors, network, etc.)
                 batchCompareError = "All \(targetPhotos.count) image comparisons failed"
                 batchCompareState = .error
                 if FeatureFlags.enableDebugBatchCompareModal {
                     print("[BatchCompareModal] State transition: MATCHING → ERROR (all failed)")
                 }
-            } else if batchResponse.failedComparisons > 0 {
-                batchCompareError = "\(batchResponse.failedComparisons) of \(targetPhotos.count) comparisons had issues"
+            } else if hasTechnicalFailures {
+                // Some comparisons had technical issues, but others succeeded
+                batchCompareError = "\(technicalFailures.count) of \(targetPhotos.count) comparisons had issues"
                 batchCompareState = .matched
                 if FeatureFlags.enableDebugBatchCompareModal {
                     print("[BatchCompareModal] State transition: MATCHING → MATCHED (partial success)")
                 }
             } else {
+                // All comparisons completed successfully (regardless of whether matches were found)
                 batchCompareState = .matched
                 if FeatureFlags.enableDebugBatchCompareModal {
-                    print("[BatchCompareModal] State transition: MATCHING → MATCHED (all successful)")
+                    if hasAnyMatches {
+                        print("[BatchCompareModal] State transition: MATCHING → MATCHED (found \(matchingResults.count) matches)")
+                    } else {
+                        print("[BatchCompareModal] State transition: MATCHING → MATCHED (no matches found)")
+                    }
                 }
+            }
+            
+            // Send notification for batch compare completion
+            if FeatureFlags.enablePushNotifications {
+                let matchCount = allResults.filter { !$0.faceMatches.isEmpty }.count
+                NotificationService.shared.sendBatchCompareCompleteNotification(matchCount: matchCount)
             }
             
         } catch {
@@ -579,15 +629,6 @@ class AppState: ObservableObject {
                 print("[AppState] Auto-presenting batch compare modal for send photos mode")
                 print("[AppState] Current user photos available: \(photos.count)")
                 print("[AppState] Target user: \(user.displayName) (ID: \(user.id))")
-                
-                // Log sample of available photos for debugging
-                let samplePhotos = Array(photos.prefix(3))
-                for (index, photo) in samplePhotos.enumerated() {
-                    print("[AppState] Sample photo \(index + 1) for batch compare:")
-                    print("  - ID: \(photo.id)")
-                    print("  - mediaItemId: \(photo.mediaItemId)")
-                    print("  - URL: \(photo.baseUrl)")
-                }
             }
             isBatchCompareModalPresented = true
         }

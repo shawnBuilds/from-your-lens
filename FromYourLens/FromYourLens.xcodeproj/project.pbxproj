@@ -22,7 +22,6 @@
 		294C4D0D2E0AF913004CF461 /* Constants.swift in Sources */ = {isa = PBXBuildFile; fileRef = 294C4D0C2E0AF913004CF461 /* Constants.swift */; };
 		294C4D0F2E0AF9C0004CF461 /* AppView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 294C4D0E2E0AF9C0004CF461 /* AppView.swift */; };
 		294C4D112E0B1370004CF461 /* LandingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 294C4D102E0B136F004CF461 /* LandingView.swift */; };
-		294C4D152E0B15BA004CF461 /* TestingFormView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 294C4D122E0B15BA004CF461 /* TestingFormView.swift */; };
 		294C4D162E0B15BA004CF461 /* PhotosView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 294C4D132E0B15BA004CF461 /* PhotosView.swift */; };
 		294C4D172E0B15BA004CF461 /* LoadingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 294C4D142E0B15BA004CF461 /* LoadingView.swift */; };
 		294C4D212E0B210A004CF461 /* Fredoka-VariableFont_wdth,wght.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 294C4D1F2E0B2109004CF461 /* Fredoka-VariableFont_wdth,wght.ttf */; };
@@ -43,9 +42,12 @@
 		2965D7672E26EA56005F2900 /* InviteFriendsModal.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2965D7662E26EA56005F2900 /* InviteFriendsModal.swift */; };
 		2965D7692E26ECDF005F2900 /* HowItWorksSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2965D7682E26ECDF005F2900 /* HowItWorksSection.swift */; };
 		2965D76B2E26EF8B005F2900 /* ShareSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2965D76A2E26EF8A005F2900 /* ShareSheet.swift */; };
+		2965D76D2E295725005F2900 /* KeyboardManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2965D76C2E295724005F2900 /* KeyboardManager.swift */; };
 		297180022E14384C00366BF4 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = 297180012E14384C00366BF4 /* GoogleSignIn */; };
 		297180042E14384C00366BF4 /* GoogleSignInSwift in Frameworks */ = {isa = PBXBuildFile; productRef = 297180032E14384C00366BF4 /* GoogleSignInSwift */; };
 		297180072E143FB400366BF4 /* GoogleOAuthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 297180062E143FB300366BF4 /* GoogleOAuthService.swift */; };
+		297BA9A72E2ABE530031B541 /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 297BA9A62E2ABE530031B541 /* NotificationService.swift */; };
+		297BA9A92E2AC0CD0031B541 /* NotificationPermissionModal.swift in Sources */ = {isa = PBXBuildFile; fileRef = 297BA9A82E2AC0CD0031B541 /* NotificationPermissionModal.swift */; };
 		29AE9B712E0EEF6300B4CB91 /* FaceApiService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29AE9B702E0EEF6300B4CB91 /* FaceApiService.swift */; };
 		29AE9B732E0EEF7600B4CB91 /* BatchCompareModal.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29AE9B722E0EEF7600B4CB91 /* BatchCompareModal.swift */; };
 		29D1F6342E13056900A68FE9 /* TargetPhotosCarouselView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29D1F6332E13056900A68FE9 /* TargetPhotosCarouselView.swift */; };
@@ -89,7 +91,6 @@
 		294C4D0C2E0AF913004CF461 /* Constants.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Constants.swift; sourceTree = "<group>"; };
 		294C4D0E2E0AF9C0004CF461 /* AppView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AppView.swift; sourceTree = "<group>"; };
 		294C4D102E0B136F004CF461 /* LandingView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = LandingView.swift; sourceTree = "<group>"; };
-		294C4D122E0B15BA004CF461 /* TestingFormView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = TestingFormView.swift; sourceTree = "<group>"; };
 		294C4D132E0B15BA004CF461 /* PhotosView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PhotosView.swift; sourceTree = "<group>"; };
 		294C4D142E0B15BA004CF461 /* LoadingView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = LoadingView.swift; sourceTree = "<group>"; };
 		294C4D1F2E0B2109004CF461 /* Fredoka-VariableFont_wdth,wght.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Fredoka-VariableFont_wdth,wght.ttf"; sourceTree = "<group>"; };
@@ -110,8 +111,11 @@
 		2965D7662E26EA56005F2900 /* InviteFriendsModal.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = InviteFriendsModal.swift; sourceTree = "<group>"; };
 		2965D7682E26ECDF005F2900 /* HowItWorksSection.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = HowItWorksSection.swift; sourceTree = "<group>"; };
 		2965D76A2E26EF8A005F2900 /* ShareSheet.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ShareSheet.swift; sourceTree = "<group>"; };
+		2965D76C2E295724005F2900 /* KeyboardManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = KeyboardManager.swift; sourceTree = "<group>"; };
 		297180052E143D6B00366BF4 /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 		297180062E143FB300366BF4 /* GoogleOAuthService.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = GoogleOAuthService.swift; sourceTree = "<group>"; };
+		297BA9A62E2ABE530031B541 /* NotificationService.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
+		297BA9A82E2AC0CD0031B541 /* NotificationPermissionModal.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = NotificationPermissionModal.swift; sourceTree = "<group>"; };
 		29AE9B702E0EEF6300B4CB91 /* FaceApiService.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = FaceApiService.swift; sourceTree = "<group>"; };
 		29AE9B722E0EEF7600B4CB91 /* BatchCompareModal.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BatchCompareModal.swift; sourceTree = "<group>"; };
 		29D1F6332E13056900A68FE9 /* TargetPhotosCarouselView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = TargetPhotosCarouselView.swift; sourceTree = "<group>"; };
@@ -219,6 +223,8 @@
 		294C4C8E2E0AE968004CF461 /* services */ = {
 			isa = PBXGroup;
 			children = (
+				297BA9A62E2ABE530031B541 /* NotificationService.swift */,
+				2965D76C2E295724005F2900 /* KeyboardManager.swift */,
 				2965D7642E25858E005F2900 /* PhotoDownloadService.swift */,
 				2965D7562E1D98AA005F2900 /* PhotoUploadService.swift */,
 				297180062E143FB300366BF4 /* GoogleOAuthService.swift */,
@@ -242,6 +248,7 @@
 		294C4C922E0AE968004CF461 /* views */ = {
 			isa = PBXGroup;
 			children = (
+				297BA9A82E2AC0CD0031B541 /* NotificationPermissionModal.swift */,
 				2965D76A2E26EF8A005F2900 /* ShareSheet.swift */,
 				2965D7682E26ECDF005F2900 /* HowItWorksSection.swift */,
 				2965D7662E26EA56005F2900 /* InviteFriendsModal.swift */,
@@ -261,7 +268,6 @@
 				294C4D222E0C6C38004CF461 /* SkipAuthModal.swift */,
 				294C4D142E0B15BA004CF461 /* LoadingView.swift */,
 				294C4D132E0B15BA004CF461 /* PhotosView.swift */,
-				294C4D122E0B15BA004CF461 /* TestingFormView.swift */,
 				294C4D102E0B136F004CF461 /* LandingView.swift */,
 				294C4D0E2E0AF9C0004CF461 /* AppView.swift */,
 			);
@@ -431,11 +437,13 @@
 				294C4C952E0AE968004CF461 /* Photo.swift in Sources */,
 				294C4D302E0C8BD3004CF461 /* MatchingTabsView.swift in Sources */,
 				294C4D2B2E0C879D004CF461 /* HeaderView.swift in Sources */,
-				294C4D152E0B15BA004CF461 /* TestingFormView.swift in Sources */,
 				294C4D2F2E0C8BD3004CF461 /* PhotoTabsView.swift in Sources */,
 				294C4D272E0C705A004CF461 /* PhotoItemView.swift in Sources */,
+				297BA9A92E2AC0CD0031B541 /* NotificationPermissionModal.swift in Sources */,
 				2965D76B2E26EF8B005F2900 /* ShareSheet.swift in Sources */,
+				297BA9A72E2ABE530031B541 /* NotificationService.swift in Sources */,
 				294C4C9A2E0AE968004CF461 /* AppState.swift in Sources */,
+				2965D76D2E295725005F2900 /* KeyboardManager.swift in Sources */,
 				294C4D0F2E0AF9C0004CF461 /* AppView.swift in Sources */,
 				2965D7652E25858F005F2900 /* PhotoDownloadService.swift in Sources */,
 				294C4C972E0AE968004CF461 /* AuthService.swift in Sources */,

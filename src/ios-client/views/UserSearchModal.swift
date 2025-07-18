@@ -6,24 +6,49 @@ struct UserSearchModal: View {
     @State private var searchText = ""
     @State private var debouncedSearchText = ""
     @State private var filteredUsers: [User] = []
-    @State private var isKeyboardVisible = false
-    @State private var keyboardAppearTime: Date?
-    @State private var isKeyboardReady = false
+    @StateObject private var keyboardManager = KeyboardManager()
     @FocusState private var isSearchFieldFocused: Bool
+    
+    // MARK: - Computed Properties for UI States
+    
+    @ViewBuilder
+    private var contentView: some View {
+        if appState.isFetchingUsers {
+            UserSearchLoadingView()
+        } else if let error = appState.fetchUsersError {
+            ErrorView(error: error) {
+                Task {
+                    await appState.fetchAllUsers()
+                }
+            }
+        } else if filteredUsers.isEmpty {
+            EmptyStateView(searchText: debouncedSearchText)
+        } else {
+            UserListView(users: filteredUsers) { user in
+                appState.selectTargetUser(user)
+                isPresented = false
+            }
+        }
+    }
+    
+    // MARK: - Helper Methods
     
     // Debounced search text to avoid excessive filtering
     private func updateSearchText(_ newText: String) {
         searchText = newText
+        
+        // Record first input for debugging
+        if debouncedSearchText.isEmpty && !newText.isEmpty {
+            keyboardManager.recordFirstInput()
+        }
         
         // Early return if filtering is disabled
         guard FeatureFlags.enableUpdateFilteredUsersInSearch else {
             return
         }
         
-
-        
-        // Use a shorter debounce for first input to reduce perceived lag
-        let debounceTime: UInt64 = debouncedSearchText.isEmpty ? 150_000_000 : 300_000_000
+        // Reduced debounce times for faster response
+        let debounceTime: UInt64 = debouncedSearchText.isEmpty ? 50_000_000 : 100_000_000 // Reduced from 150ms/300ms to 50ms/100ms
         
         // Debounce the search to avoid excessive filtering
         Task {
@@ -45,12 +70,11 @@ struct UserSearchModal: View {
         
         // Run filtering off the main thread to prevent UI blocking
         Task {
-            // Add a small delay for the first filtering to let keyboard animation complete
+            // Reduced delay for first filtering
             if filteredUsers.isEmpty && !debouncedSearchText.isEmpty {
-                try? await Task.sleep(nanoseconds: 50_000_000) // 50ms delay
+                let delayTime: UInt64 = 10_000_000 // Reduced from 50ms to 10ms
+                try? await Task.sleep(nanoseconds: delayTime)
             }
-            
-            let startTime = Date()
             
             // Pre-compute search term once
             let searchLower = debouncedSearchText.lowercased()
@@ -120,7 +144,6 @@ struct UserSearchModal: View {
                     Image(systemName: "magnifyingglass")
                         .foregroundColor(.textColorSecondary)
                     TextField("Search by name or email...", text: $searchText)
-                        .textFieldStyle(PlainTextFieldStyle())
                         .foregroundColor(.textColorPrimary)
                         .focused($isSearchFieldFocused)
                         .onChange(of: searchText) { newValue in
@@ -129,6 +152,7 @@ struct UserSearchModal: View {
                         .onSubmit {
                             // Handle search submission if needed
                         }
+
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
@@ -137,72 +161,18 @@ struct UserSearchModal: View {
                 .padding(.horizontal, 24)
                 .padding(.vertical, 16)
                 
-                // User List
-                if appState.isFetchingUsers {
-                    VStack(spacing: 16) {
-                        ProgressView()
-                            .scaleEffect(1.2)
-                        Text("Loading users...")
-                            .font(.body)
-                            .foregroundColor(.textColorSecondary)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if let error = appState.fetchUsersError {
-                    VStack(spacing: 16) {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .font(.system(size: 48))
-                            .foregroundColor(.orange)
-                        Text("Failed to load users")
-                            .font(.headline)
-                            .foregroundColor(.textColorPrimary)
-                        Text(error.localizedDescription)
-                            .font(.caption)
-                            .foregroundColor(.textColorSecondary)
-                            .multilineTextAlignment(.center)
-                        Button("Retry") {
-                            Task {
-                                await appState.fetchAllUsers()
-                            }
-                        }
-                        .padding(.horizontal, 24)
-                        .padding(.vertical, 12)
-                        .background(Color.primaryColor)
-                        .foregroundColor(.white)
-                        .cornerRadius(8)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if filteredUsers.isEmpty {
-                    VStack(spacing: 16) {
-                        Image(systemName: debouncedSearchText.isEmpty ? "magnifyingglass" : "person.3.fill")
-                            .font(.system(size: 48))
-                            .foregroundColor(.textColorSecondary)
-                        Text(debouncedSearchText.isEmpty ? "Search for a friend" : "No users match your search")
-                            .font(.headline)
-                            .foregroundColor(.textColorPrimary)
-                        Text(debouncedSearchText.isEmpty ? "Type a name or email to find friends" : "Try a different search term")
-                            .font(.caption)
-                            .foregroundColor(.textColorSecondary)
-                            .multilineTextAlignment(.center)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else {
-                    ScrollView {
-                        LazyVStack(spacing: 0) {
-                            ForEach(filteredUsers) { user in
-                                UserRowView(user: user) {
-                                    appState.selectTargetUser(user)
-                                    isPresented = false
-                                }
-                            }
-                        }
-                        .padding(.horizontal, 24)
-                    }
-                }
+                // User List - Now using extracted content view
+                contentView
             }
             .frame(maxWidth: 500, maxHeight: .infinity)
             .background(Color.secondaryColor)
             .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
             .shadow(color: Color.neumorphicShadow.opacity(0.18), radius: 8, x: 0, y: 4)
+            .onTapGesture {
+                // Dismiss keyboard when tapping outside the text field
+                isSearchFieldFocused = false
+                UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+            }
         .onAppear {
             // Fetch users in background if needed, but don't block UI
             if appState.allUsers.isEmpty {
@@ -211,29 +181,121 @@ struct UserSearchModal: View {
                 }
             }
             
-            // Delay TextField focus to let keyboard system initialize
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                isSearchFieldFocused = true
-            }
+            // Focus search field using keyboard manager
+            keyboardManager.focusSearchField($isSearchFieldFocused)
         }
         .onChange(of: isSearchFieldFocused) { isFocused in
             if isFocused {
-                keyboardAppearTime = Date()
+                keyboardManager.keyboardAppearTime = Date()
             }
         }
-        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
-            isKeyboardVisible = true
+    }
+}
+
+// MARK: - Helper Views
+
+struct UserSearchLoadingView: View {
+    var body: some View {
+        VStack(spacing: 16) {
+            ProgressView()
+                .scaleEffect(1.2)
+            Text("Loading users...")
+                .font(.body)
+                .foregroundColor(.textColorSecondary)
         }
-        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardDidShowNotification)) { _ in
-            isKeyboardVisible = true
-            // Mark keyboard as ready after it's fully shown
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                isKeyboardReady = true
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onTapGesture {
+            // Dismiss keyboard when tapping on the loading view
+            UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+        }
+    }
+}
+
+struct ErrorView: View {
+    let error: Error
+    let onRetry: () -> Void
+    
+    var body: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 48))
+                .foregroundColor(.orange)
+            Text("Failed to load users")
+                .font(.headline)
+                .foregroundColor(.textColorPrimary)
+            Text(error.localizedDescription)
+                .font(.caption)
+                .foregroundColor(.textColorSecondary)
+                .multilineTextAlignment(.center)
+            Button("Retry", action: onRetry)
+                .padding(.horizontal, 24)
+                .padding(.vertical, 12)
+                .background(Color.primaryColor)
+                .foregroundColor(.white)
+                .cornerRadius(8)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onTapGesture {
+            // Dismiss keyboard when tapping on the error view
+            UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+        }
+    }
+}
+
+struct EmptyStateView: View {
+    let searchText: String
+    
+    private var iconName: String {
+        searchText.isEmpty ? "magnifyingglass" : "person.3.fill"
+    }
+    
+    private var title: String {
+        searchText.isEmpty ? "Search for a friend" : "No users match your search"
+    }
+    
+    private var subtitle: String {
+        searchText.isEmpty ? "Type a name or email to find friends" : "Try a different search term"
+    }
+    
+    var body: some View {
+        VStack(spacing: 16) {
+            Image(systemName: iconName)
+                .font(.system(size: 48))
+                .foregroundColor(.textColorSecondary)
+            Text(title)
+                .font(.headline)
+                .foregroundColor(.textColorPrimary)
+            Text(subtitle)
+                .font(.caption)
+                .foregroundColor(.textColorSecondary)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onTapGesture {
+            // Dismiss keyboard when tapping on the empty state view
+            UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+        }
+    }
+}
+
+struct UserListView: View {
+    let users: [User]
+    let onUserSelect: (User) -> Void
+    
+    var body: some View {
+        ScrollView {
+            LazyVStack(spacing: 0) {
+                ForEach(users) { user in
+                    UserRowView(user: user) {
+                        onUserSelect(user)
+                    }
+                }
             }
+            .padding(.horizontal, 24)
         }
-        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
-            isKeyboardVisible = false
-            isKeyboardReady = false
+        .onTapGesture {
+            // Dismiss keyboard when tapping on the scroll view
+            UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
         }
     }
 }

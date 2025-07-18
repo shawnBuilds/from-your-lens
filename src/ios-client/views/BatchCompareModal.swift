@@ -9,6 +9,7 @@ struct BatchCompareModal: View {
     @State private var showingSourcePhotoPicker = false
     @State private var showingTargetPhotoPicker = false
     @State private var showingProfilePicturePicker = false
+    @State private var showingNotificationPermissionModal = false
     
     // Auto-populate target photos when modal appears
     private var autoPopulatedTargetPhotos: [Photo] {
@@ -58,6 +59,7 @@ struct BatchCompareModal: View {
                                 showingSourcePhotoPicker: $showingSourcePhotoPicker,
                                 showingTargetPhotoPicker: $showingTargetPhotoPicker,
                                 showingProfilePicturePicker: $showingProfilePicturePicker,
+                                showingNotificationPermissionModal: $showingNotificationPermissionModal,
                                 autoPopulatedPhotos: autoPopulatedTargetPhotos,
                                 appState: appState
                             )
@@ -111,6 +113,19 @@ struct BatchCompareModal: View {
                 isAutoPrompt: false
             )
         }
+        .sheet(isPresented: $showingNotificationPermissionModal) {
+            NotificationPermissionModal(
+                isPresented: $showingNotificationPermissionModal,
+                onEnableNotifications: {
+                    Task {
+                        await requestNotificationPermissionAndProceed()
+                    }
+                },
+                onContinueWithoutNotifications: {
+                    proceedWithBatchCompare()
+                }
+            )
+        }
         .onChange(of: showingProfilePicturePicker) { isPresented in
             // When profile picture picker is dismissed, check if we should auto-populate source photo
             if !isPresented && selectedSourcePhoto == nil {
@@ -125,6 +140,29 @@ struct BatchCompareModal: View {
             if selectedSourcePhoto == nil {
                 selectedSourcePhoto = autoPopulatedSourcePhoto
             }
+        }
+    }
+    
+    // MARK: - Helper Methods
+    private func requestNotificationPermissionAndProceed() async {
+        let granted = await NotificationService.shared.requestPermission()
+        
+        await MainActor.run {
+            if FeatureFlags.enableDebugLogNotifications {
+                print("[BatchCompareModal] Notification permission result: \(granted)")
+            }
+            proceedWithBatchCompare()
+        }
+    }
+    
+    private func proceedWithBatchCompare() {
+        guard let sourcePhoto = selectedSourcePhoto else { return }
+        
+        Task {
+            await appState.startBatchCompare(
+                sourcePhoto: sourcePhoto,
+                targetPhotos: selectedTargetPhotos
+            )
         }
     }
 }
@@ -342,6 +380,7 @@ struct ProgressSection: View {
 // MARK: - Results Section
 struct ResultsSection: View {
     let results: [BatchCompareResult]
+    @ObservedObject var appState: AppState
     @State private var carouselIndex: Int = 0
     
     var matchingResults: [BatchCompareResult] {
@@ -349,44 +388,37 @@ struct ResultsSection: View {
     }
     
     var body: some View {
-        if !results.isEmpty {
+        if !results.isEmpty && !matchingResults.isEmpty {
             VStack(alignment: .leading, spacing: 12) {
-                if !matchingResults.isEmpty {
-                    BaseCarouselView(items: matchingResults, currentIndex: $carouselIndex) { result in
-                        ZStack(alignment: .topTrailing) {
-                            BatchComparePhotoView(photo: result.photo, size: 220)
-                            
-                            // Overlay X button for removing matching results
-                            Button(action: {
-                                if let index = matchingResults.firstIndex(where: { $0.id == result.id }) {
-                                    if FeatureFlags.enableDebugBatchCompareModal {
-                                        print("[BatchCompareModal] Removing matching result: \(result.targetFileName)")
-                                    }
-                                    // Note: This would need to be implemented in AppState to actually remove from results
+                BaseCarouselView(items: matchingResults, currentIndex: $carouselIndex) { result in
+                    ZStack(alignment: .topTrailing) {
+                        BatchComparePhotoView(photo: result.photo, size: 220)
+                        
+                        // Overlay X button for removing matching results
+                        Button(action: {
+                            if let index = matchingResults.firstIndex(where: { $0.id == result.id }) {
+                                if FeatureFlags.enableDebugBatchCompareModal {
+                                    print("[BatchCompareModal] Removing matching result: \(result.targetFileName)")
                                 }
-                            }) {
-                                Image(systemName: "xmark.circle.fill")
-                                    .foregroundColor(.red)
-                                    .font(.system(size: 32, weight: .bold))
-                                    .background(Color.white.opacity(0.8))
-                                    .clipShape(Circle())
-                                    .padding(6)
+                                // Note: This would need to be implemented in AppState to actually remove from results
                             }
-                            .offset(x: -8, y: 8)
+                        }) {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundColor(.red)
+                                .font(.system(size: 32, weight: .bold))
+                                .background(Color.white.opacity(0.8))
+                                .clipShape(Circle())
+                                .padding(6)
                         }
-                        .frame(width: 220, height: 220)
-                        .shadow(color: Color.neumorphicShadow.opacity(0.18), radius: 8, x: 0, y: 4)
+                        .offset(x: -8, y: 8)
                     }
-                    .onAppear {
-                        if FeatureFlags.enableDebugBatchCompareModal {
-                            print("[BatchCompareModal] Displaying \(matchingResults.count) matching results")
-                        }
+                    .frame(width: 220, height: 220)
+                    .shadow(color: Color.neumorphicShadow.opacity(0.18), radius: 8, x: 0, y: 4)
+                }
+                .onAppear {
+                    if FeatureFlags.enableDebugBatchCompareModal {
+                        print("[BatchCompareModal] Displaying \(matchingResults.count) matching results")
                     }
-                } else {
-                    Text("No matching images found.")
-                        .font(.caption)
-                        .foregroundColor(.textColorSecondary)
-                        .padding(.vertical, 12)
                 }
             }
         }
@@ -399,16 +431,22 @@ struct ActionButtonsSection: View {
     let selectedTargetPhotos: [Photo]
     @ObservedObject var appState: AppState
     @Binding var isPresented: Bool
+    @Binding var showingNotificationPermissionModal: Bool
     
     var body: some View {
         VStack(spacing: 12) {
             if selectedSourcePhoto != nil && !selectedTargetPhotos.isEmpty && !appState.isBatchComparing {
                 Button(action: {
                     Task {
-                        await appState.startBatchCompare(
+                        let shouldProceed = await appState.startBatchCompareWithPermissionCheck(
                             sourcePhoto: selectedSourcePhoto!,
                             targetPhotos: selectedTargetPhotos
                         )
+                        
+                        if !shouldProceed {
+                            // Show permission modal
+                            showingNotificationPermissionModal = true
+                        }
                     }
                 }) {
                     HStack {
@@ -572,6 +610,7 @@ struct WaitingStateContent: View {
     @Binding var showingSourcePhotoPicker: Bool
     @Binding var showingTargetPhotoPicker: Bool
     @Binding var showingProfilePicturePicker: Bool
+    @Binding var showingNotificationPermissionModal: Bool
     let autoPopulatedPhotos: [Photo]
     @ObservedObject var appState: AppState
     
@@ -604,10 +643,15 @@ struct WaitingStateContent: View {
             if selectedSourcePhoto != nil && !selectedTargetPhotos.isEmpty {
                 Button(action: {
                     Task {
-                        await appState.startBatchCompare(
+                        let shouldProceed = await appState.startBatchCompareWithPermissionCheck(
                             sourcePhoto: selectedSourcePhoto!,
                             targetPhotos: selectedTargetPhotos
                         )
+                        
+                        if !shouldProceed {
+                            // Show permission modal
+                            showingNotificationPermissionModal = true
+                        }
                     }
                 }) {
                     HStack {
@@ -633,36 +677,32 @@ struct MatchingStateContent: View {
     @ObservedObject var appState: AppState
     
     var body: some View {
-        VStack(spacing: 24) {
-            // Show selected source photo
-            if let sourcePhoto = selectedSourcePhoto {
-                BatchComparePhotoView(photo: sourcePhoto, size: 80)
-            }
+        VStack(spacing: 0) {
+            Spacer()
             
-            // Show target photos being processed
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Processing Photos")
-                    .font(.headline)
-                    .fontWeight(.semibold)
-                    .foregroundColor(.textColorPrimary)
+            // Time estimate and explanation - now the focal point
+            VStack(spacing: 20) {
+                Image(systemName: "clock.fill")
+                    .font(.system(size: 48))
+                    .foregroundColor(.primaryColor)
                 
-                TargetPhotosCarouselView(
-                    photos: .constant(selectedTargetPhotos),
-                    carouselIndex: .constant(0)
-                )
+                Text("This may take a few minutes...")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .foregroundColor(.textColorPrimary)
+                    .multilineTextAlignment(.center)
+                
+                Text("We'll send you a notification when the photos are ready for you to review. Feel free to check out other apps on your phone while you wait!")
+                    .font(.title3)
+                    .foregroundColor(.textColorSecondary)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(nil)
+                    .padding(.horizontal, 16)
             }
+            .padding(.horizontal, 24)
+            .padding(.vertical, 40)
             
-            // Progress bar
-            FaceMatchingProgressBar(
-                progress: appState.batchCompareProgress
-            )
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
-            
-            // Progress text
-            Text("Comparing photos... \(Int(appState.batchCompareProgress * 100))%")
-                .font(.caption)
-                .foregroundColor(.textColorSecondary)
+            Spacer()
         }
     }
 }
@@ -676,35 +716,35 @@ struct MatchedStateContent: View {
     
     var body: some View {
         VStack(spacing: 24) {
-            // Results carousel
-            if !appState.batchCompareResults.isEmpty {
-                ResultsSection(results: appState.batchCompareResults)
-            }
+            // Check if we have any matching results
+            let matchingResults = appState.batchCompareResults.filter { !$0.faceMatches.isEmpty }
             
-            // Action buttons
-            VStack(spacing: 12) {
+            if !matchingResults.isEmpty {
+                // Show results carousel when we have matches
+                ResultsSection(results: appState.batchCompareResults, appState: appState)
+                
                 // Confirm matches button
-                let matchingResults = appState.batchCompareResults.filter { !$0.faceMatches.isEmpty }
-                if !matchingResults.isEmpty {
-                    Button(action: {
-                        Task {
-                            await appState.confirmMatches()
-                            isPresented = false
-                            appState.resetBatchCompare()
-                        }
-                    }) {
-                        HStack {
-                            Image(systemName: "checkmark.circle.fill")
-                            Text("Confirm \(matchingResults.count) Matches")
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.primaryColor)
-                        .foregroundColor(.white)
-                        .clipShape(RoundedRectangle(cornerRadius: 22))
-                        .shadow(color: Color.neumorphicShadow.opacity(0.18), radius: 4, x: 0, y: 2)
+                Button(action: {
+                    Task {
+                        await appState.confirmMatches()
+                        isPresented = false
+                        appState.resetBatchCompare()
                     }
+                }) {
+                    HStack {
+                        Image(systemName: "checkmark.circle.fill")
+                        Text("Confirm \(matchingResults.count) Matches")
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Color.primaryColor)
+                    .foregroundColor(.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 22))
+                    .shadow(color: Color.neumorphicShadow.opacity(0.18), radius: 4, x: 0, y: 2)
                 }
+            } else {
+                // Show "No Matches Found" view when no matches
+                NoMatchesFoundView(appState: appState, isPresented: $isPresented)
             }
         }
     }
@@ -846,5 +886,116 @@ struct BatchComparePhotoView: View {
             }
         }
         .id(photo.id) // Ensure the whole view resets when photo changes
+    }
+} 
+
+// MARK: - No Matches Found View
+struct NoMatchesFoundView: View {
+    @ObservedObject var appState: AppState
+    @Binding var isPresented: Bool
+    
+    var body: some View {
+        VStack(spacing: 24) {
+            // Icon
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 64))
+                .foregroundColor(.gray)
+                .padding(.bottom, 8)
+            
+            // Main message
+            VStack(spacing: 16) {
+                Text("No Photos Found")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .foregroundColor(.textColorPrimary)
+                
+                Text("We couldn't find any photos with the person you're looking for.")
+                    .font(.body)
+                    .foregroundColor(.textColorSecondary)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(nil)
+            }
+            
+            // Helpful suggestions
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Here are some things to check:")
+                    .font(.headline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.textColorPrimary)
+                
+                VStack(alignment: .leading, spacing: 8) {
+                    SuggestionRow(
+                        icon: "person.crop.circle",
+                        text: "Make sure their profile picture clearly shows their face"
+                    )
+                    
+                    SuggestionRow(
+                        icon: "photo.on.rectangle",
+                        text: "Check if they're actually in the photos you selected"
+                    )
+                }
+            }
+            .padding(.horizontal, 16)
+            
+            // Action buttons
+            VStack(spacing: 12) {
+                Button(action: {
+                    // Reset and try again
+                    appState.resetBatchCompare()
+                }) {
+                    HStack {
+                        Image(systemName: "arrow.clockwise")
+                        Text("Try Again")
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Color.primaryColor)
+                    .foregroundColor(.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 22))
+                    .shadow(color: Color.neumorphicShadow.opacity(0.18), radius: 4, x: 0, y: 2)
+                }
+                
+                Button(action: {
+                    // Close modal
+                    isPresented = false
+                    appState.resetBatchCompare()
+                }) {
+                    Text("Close")
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color.neumorphicShadow.opacity(0.15))
+                        .foregroundColor(Color.textColorPrimary)
+                        .clipShape(RoundedRectangle(cornerRadius: 22))
+                        .shadow(color: Color.neumorphicShadow.opacity(0.18), radius: 4, x: 0, y: 2)
+                }
+            }
+        }
+        .padding(.horizontal, 24)
+        .padding(.vertical, 32)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .padding(.horizontal, 16)
+    }
+}
+
+// MARK: - Suggestion Row Component
+struct SuggestionRow: View {
+    let icon: String
+    let text: String
+    
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 16, weight: .medium))
+                .foregroundColor(.primaryColorDark)
+                .frame(width: 20)
+            
+            Text(text)
+                .font(.body)
+                .foregroundColor(.textColorSecondary)
+                .multilineTextAlignment(.leading)
+                .lineLimit(nil)
+            
+            Spacer()
+        }
     }
 } 

@@ -43,7 +43,7 @@ struct FaceComparisonResult {
 }
 
 // MARK: - Batch Compare Results
-struct BatchCompareResult: Identifiable {
+struct BatchCompareResult: Identifiable, Codable {
     var id: String { targetFileName }
     let targetFileName: String
     let photo: Photo
@@ -53,6 +53,61 @@ struct BatchCompareResult: Identifiable {
     let targetFaceCount: Int
     let error: String?
     let rejected: Bool
+    
+    // MARK: - Coding Keys for API Response
+    enum CodingKeys: String, CodingKey {
+        case targetFileName
+        case faceMatches = "FaceMatches"
+        case unmatchedFaces = "UnmatchedFaces"
+        case sourceFaceCount
+        case targetFaceCount
+        case error
+        case success
+    }
+    
+    // MARK: - Custom Initializer for API Response
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        
+        targetFileName = try container.decode(String.self, forKey: .targetFileName)
+        faceMatches = try container.decodeIfPresent([FaceMatch].self, forKey: .faceMatches) ?? []
+        unmatchedFaces = try container.decodeIfPresent([FaceDetail].self, forKey: .unmatchedFaces) ?? []
+        sourceFaceCount = try container.decode(Int.self, forKey: .sourceFaceCount)
+        targetFaceCount = try container.decode(Int.self, forKey: .targetFaceCount)
+        error = try container.decodeIfPresent(String.self, forKey: .error)
+        
+        // Determine if comparison was successful
+        let success = try container.decodeIfPresent(Bool.self, forKey: .success) ?? true
+        rejected = !success
+        
+        // Create a placeholder Photo object since server doesn't send photo data
+        // This will be replaced by the actual photo in AppState
+        photo = Photo.placeholder(for: targetFileName)
+    }
+    
+    // MARK: - Manual Initializer for Client Use
+    init(targetFileName: String, photo: Photo, faceMatches: [FaceMatch], unmatchedFaces: [FaceDetail], sourceFaceCount: Int, targetFaceCount: Int, error: String?, rejected: Bool) {
+        self.targetFileName = targetFileName
+        self.photo = photo
+        self.faceMatches = faceMatches
+        self.unmatchedFaces = unmatchedFaces
+        self.sourceFaceCount = sourceFaceCount
+        self.targetFaceCount = targetFaceCount
+        self.error = error
+        self.rejected = rejected
+    }
+    
+    // MARK: - Encode Method
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(targetFileName, forKey: .targetFileName)
+        try container.encode(faceMatches, forKey: .faceMatches)
+        try container.encode(unmatchedFaces, forKey: .unmatchedFaces)
+        try container.encode(sourceFaceCount, forKey: .sourceFaceCount)
+        try container.encode(targetFaceCount, forKey: .targetFaceCount)
+        try container.encodeIfPresent(error, forKey: .error)
+        try container.encode(!rejected, forKey: .success)
+    }
 }
 
 struct BatchCompareResponse {

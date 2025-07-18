@@ -189,6 +189,11 @@ class PhotoDownloadService: PhotoDownloadServiceProtocol {
             print("  - Success: \(success)")
         }
         
+        // Send notification for successful download
+        if FeatureFlags.enablePushNotifications && downloadedCount > 0 {
+            NotificationService.shared.sendDownloadCompleteNotification(downloadCount: downloadedCount)
+        }
+        
         return PhotoDownloadResult(
             success: success,
             downloadedCount: downloadedCount,
