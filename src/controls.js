@@ -19,6 +19,8 @@ const Controls = {
     enableDebugLogAuth: true,         // General auth service logs
     enableDebugLogUser: true,         // User management logs
     enableMockData: true,
+    maxBatchCompareTargets: 1000,
+    maxImageSize: 5 * 1024 * 1024, // 5MB per image (optional, for clarity)
     
     // Environment-specific overrides
     get isProduction() {

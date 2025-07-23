@@ -302,7 +302,7 @@ router.post(
   "/batch-compare",
   upload.fields([
     { name: "source", maxCount: 1 },
-    { name: "targets", maxCount: 20 } // Allow up to 20 target images
+    { name: "targets", maxCount: Controls.maxBatchCompareTargets }
   ]),
   async (req, res) => {
     if (Controls.enableDebugLogBatchCompare) {
@@ -357,9 +357,9 @@ router.post(
         return res.status(400).json({ error: "No target images provided" });
       }
 
-      if (targetFiles.length > 20) {
+      if (targetFiles.length > Controls.maxBatchCompareTargets) {
         console.error("[BatchCompare] Too many target images");
-        return res.status(400).json({ error: "Maximum 20 target images allowed" });
+        return res.status(400).json({ error: `Maximum ${Controls.maxBatchCompareTargets} target images allowed` });
       }
 
       // Validate all target files

@@ -2,6 +2,7 @@ import Foundation
 import SwiftUI
 import Combine
 import GoogleSignIn
+import UIKit
 
 @MainActor
 class AppState: ObservableObject {
@@ -10,6 +11,7 @@ class AppState: ObservableObject {
     @Published var currentView: ViewState = .landing
     @Published var isLoading: Bool = true
     @Published var availableTags: [String] = []
+    @Published var isAppInForeground: Bool = true
     
     // MARK: - Photo State
     @Published var photos: [Photo] = []
@@ -80,6 +82,44 @@ class AppState: ObservableObject {
         Task {
             await checkReturningUser()
         }
+        setupAppStateTracking()
+    }
+    
+    // MARK: - App State Tracking
+    private func setupAppStateTracking() {
+        // Listen for app state changes
+        NotificationCenter.default.addObserver(
+            forName: UIApplication.didBecomeActiveNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.isAppInForeground = true
+            if FeatureFlags.enableDebugLogNotifications {
+                print("[AppState] App entered foreground - isAppInForeground: true")
+            }
+        }
+        
+        NotificationCenter.default.addObserver(
+            forName: UIApplication.didEnterBackgroundNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.isAppInForeground = false
+            if FeatureFlags.enableDebugLogNotifications {
+                print("[AppState] App entered background - isAppInForeground: false")
+            }
+        }
+        
+        // Set initial state
+        isAppInForeground = UIApplication.shared.applicationState == .active
+        if FeatureFlags.enableDebugLogNotifications {
+            print("[AppState] Initial app state - isAppInForeground: \(isAppInForeground)")
+        }
+    }
+    
+    deinit {
+        // Clean up notification observers
+        NotificationCenter.default.removeObserver(self)
     }
     
     // MARK: - User Authentication
@@ -558,7 +598,20 @@ class AppState: ObservableObject {
             // Send notification for batch compare completion
             if FeatureFlags.enablePushNotifications {
                 let matchCount = allResults.filter { !$0.faceMatches.isEmpty }.count
-                NotificationService.shared.sendBatchCompareCompleteNotification(matchCount: matchCount)
+                
+                // Only send notification if app is not in foreground (when feature flag is enabled)
+                let shouldSkipNotification = FeatureFlags.skipBatchCompareNotificationsWhenInForeground && isAppInForeground
+                
+                if !shouldSkipNotification {
+                    if FeatureFlags.enableDebugLogNotifications {
+                        print("[AppState] Sending batch compare notification with \(matchCount) matches")
+                    }
+                    NotificationService.shared.sendBatchCompareCompleteNotification(matchCount: matchCount)
+                } else {
+                    if FeatureFlags.enableDebugLogNotifications {
+                        print("[AppState] App is in foreground, skipping batch compare notification (user will see results directly)")
+                    }
+                }
             }
             
         } catch {

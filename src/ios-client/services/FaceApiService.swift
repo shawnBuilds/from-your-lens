@@ -162,10 +162,6 @@ class FaceApiService: FaceApiServiceProtocol {
             return BatchCompareResponse.mockError
         }
         
-        guard targetImageDataArray.count <= 20 else {
-            return BatchCompareResponse.mockError
-        }
-        
         for targetImageData in targetImageDataArray {
             guard targetImageData.count >= FeatureFlags.minImageSizeForFaceDetection else {
                 return BatchCompareResponse.mockError

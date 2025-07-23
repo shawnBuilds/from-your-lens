@@ -2,68 +2,50 @@ import Foundation
 
 // MARK: - Feature Flags
 struct FeatureFlags {
+    // MARK: - Feature/Behavior Flags
     static let enableFaceDetectionOnImageLoad = false
     static let showFaceCountBadge = false
-    static let defaultBatchTargetCount = 2
+    static let defaultBatchTargetCount = 50
     static let enableGoogleDriveUsage = false
     static let enableSkipAuthFlow = false // Set to true to enable the "skip auth" modal for development
-    static let enableDebugLogSkipAuth = false // Debug: log state changes for skip auth/test data
-    static let enableDebugLogPhotoGallery = false // Debug: log data shown in photo gallery
-    static let enableDebugLogLandingView = true // Debug: log layout info for landing view
     static let enableLandingGalleryImages = true // Toggle gallery images section in LandingView
     static let enableLandingHowItWorks = true // Toggle how it works section in LandingView
-    
-    // MARK: - Time Debugging
-    static let enableDebugLogTimeSync = true // Debug: log time synchronization issues
-    
-    // MARK: - iCloud Photo Integration
     static let enableICloudPhotoUsage = true // Enable iCloud photo fetching
-    static let enableDebugLogICloudPhotos = true // Debug: log iCloud photo operations
-    static let defaultICloudPhotoCount = 100 // Default number of photos to fetch from iCloud
+    static let defaultICloudPhotoCount = 50 // Default number of photos to fetch from iCloud
     static let enableServerPhotoUsage = true // Enable server API for photos of user
-    static let enableDebugLogServerPhotos = false // Debug: log server photo operations
     static let enableTestUserWithICloudPhotos = false // Use test user with real iCloud photos instead of mock data
-    
-    // MARK: - Face Detection Integration
     static let enableFaceDetectionUsage = true // Master switch for face detection functionality
-    static let enableDebugLogFaceDetection = false // Debug: log face detection operations
-    static let enableDebugBatchCompareModal = true // Debug: log batch compare modal operations
-    
-    // MARK: - Notification Integration
     static let enablePushNotifications = true // Master switch for push notifications
-    static let enableDebugLogNotifications = true // Debug: log notification operations
     static let showNotificationPermissionModal = true // Show permission modal when notifications are disabled
-    static let enableDebugLogBatchCompare = true // Debug: log batch compare API operations (NEW)
+    static let skipBatchCompareNotificationsWhenInForeground = true // Skip notifications when app is in foreground
     static let faceDetectionSimilarityThreshold = 90.0 // Minimum similarity threshold for face matching
     static let maxImageSizeForFaceDetection = 5 * 1024 * 1024 // 5MB max image size for face detection
     static let minImageSizeForFaceDetection = 1 * 1024 // 1KB min image size for face detection
-    
-    // MARK: - Photo Upload Integration
-    static let enableDebugLogPhotoUpload = false // Debug: log photo upload operations
-    
-    // MARK: - Photo Download Integration
-    static let enableDebugLogPhotoDownload = true // Debug: log photo download operations
-    
-    // MARK: - OAuth Integration
-    static let enableDebugLogOAuth = false // Debug: log OAuth operations and network requests
-    static let enableDebugLogAuth = true // Debug: log AuthService operations and token validation
-    static let enableDebugLogUser = false // Debug: log user fetch/search operations
     static let enableAutoProfilePicturePrompt = true // Auto-show PFP picker for users without profile pictures
     static let enableUpdateFilteredUsersInSearch = true // Debug: enable/disable filtering in UserSearchModal
-    
-    // MARK: - Keyboard Debugging
-    static let enableDebugLogKeyboard = true // Debug: log keyboard events and timing
-    
-    // MARK: - Photo Selection Limits
     static let maxSourcePhotoSelection = 1 // Maximum number of source photos that can be selected
-    static let maxTargetPhotoSelection = 10 // Maximum number of target photos that can be selected for batch comparison
-    
-    // MARK: - Modal Behavior Control
-    static let showCompareModalOnFindPhotosClick = true // Show batch compare modal when "Find Photos" is clicked
-    
-    // MARK: - Invite Configuration
-    static let inviteAppLink = "https://testflight.apple.com/join/INVITE_CODE" // Placeholder TestFlight link for invite sharing
-}        
+    static let maxTargetPhotoSelection = 50 // Maximum number of target photos that can be selected for batch comparison
+    static let showCompareModalOnFindPhotosClick = false // Show batch compare modal when "Find Photos" is clicked
+    static let inviteAppLink = "https://testflight.apple.com/join/INVITE_CODE_TODO" // Placeholder TestFlight link for invite sharing
+
+    // MARK: - Debug Logging Flags
+    static let enableDebugLogSkipAuth = false // Debug: log state changes for skip auth/test data
+    static let enableDebugLogPhotoGallery = false // Debug: log data shown in photo gallery
+    static let enableDebugLogLandingView = false // Debug: log layout info for landing view
+    static let enableDebugLogTimeSync = false // Debug: log time synchronization issues
+    static let enableDebugLogICloudPhotos = false // Debug: log iCloud photo operations
+    static let enableDebugLogServerPhotos = false // Debug: log server photo operations
+    static let enableDebugLogFaceDetection = true // Debug: log face detection operations
+    static let enableDebugBatchCompareModal = true // Debug: log batch compare modal operations
+    static let enableDebugLogNotifications = false // Debug: log notification operations
+    static let enableDebugLogBatchCompare = true // Debug: log batch compare API operations (NEW)
+    static let enableDebugLogPhotoUpload = false // Debug: log photo upload operations
+    static let enableDebugLogPhotoDownload = false // Debug: log photo download operations
+    static let enableDebugLogOAuth = false // Debug: log OAuth operations and network requests
+    static let enableDebugLogAuth = false // Debug: log AuthService operations and token validation
+    static let enableDebugLogUser = false // Debug: log user fetch/search operations
+    static let enableDebugLogKeyboard = false // Debug: log keyboard events and timing
+}
 
 // MARK: - API Configuration
 struct APIConfig {
