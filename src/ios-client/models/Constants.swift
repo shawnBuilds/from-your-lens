@@ -14,7 +14,7 @@ struct FeatureFlags {
     static let defaultICloudPhotoCount = 40 // Default number of photos to fetch from iCloud
     static let enableServerPhotoUsage = true // Enable server API for photos of user
     static let enableTestUserWithICloudPhotos = false // Use test user with real iCloud photos instead of mock data
-    static let enableFaceDetectionUsage = true // Master switch for face detection functionality
+    static let enableFaceDetectionUsage = true // Master switch for fa`ce detection functionality
     static let enablePushNotifications = true // Master switch for push notifications
     static let showNotificationPermissionModal = true // Show permission modal when notifications are disabled
     static let skipBatchCompareNotificationsWhenInForeground = true // Skip notifications when app is in foreground
