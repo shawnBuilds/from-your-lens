@@ -5,13 +5,13 @@ struct FeatureFlags {
     // MARK: - Feature/Behavior Flags
     static let enableFaceDetectionOnImageLoad = false
     static let showFaceCountBadge = false
-    static let defaultBatchTargetCount = 50
+    static let defaultBatchTargetCount = 40
     static let enableGoogleDriveUsage = false
     static let enableSkipAuthFlow = false // Set to true to enable the "skip auth" modal for development
     static let enableLandingGalleryImages = true // Toggle gallery images section in LandingView
     static let enableLandingHowItWorks = true // Toggle how it works section in LandingView
     static let enableICloudPhotoUsage = true // Enable iCloud photo fetching
-    static let defaultICloudPhotoCount = 50 // Default number of photos to fetch from iCloud
+    static let defaultICloudPhotoCount = 40 // Default number of photos to fetch from iCloud
     static let enableServerPhotoUsage = true // Enable server API for photos of user
     static let enableTestUserWithICloudPhotos = false // Use test user with real iCloud photos instead of mock data
     static let enableFaceDetectionUsage = true // Master switch for face detection functionality
