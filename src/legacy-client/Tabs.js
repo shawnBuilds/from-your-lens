@@ -141,7 +141,7 @@ var Tabs = function(param) {
                         children: [
                             /*#__PURE__*/ _jsxDEV("img", {
                                 src: ICON_URLS.FIND_PHOTOS,
-                                alt: "Get photos of me",
+                                alt: "Find photos of me",
                                 className: "tab-icon"
                             }, void 0, false, {
                                 fileName: "Tabs.jsx",
@@ -149,7 +149,7 @@ var Tabs = function(param) {
                                 columnNumber: 11
                             }, _this),
                             /*#__PURE__*/ _jsxDEV("span", {
-                                children: "Get photos of me"
+                                children: "Find photos of me"
                             }, void 0, false, {
                                 fileName: "Tabs.jsx",
                                 lineNumber: 41,
