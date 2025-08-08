@@ -279,26 +279,37 @@ class FaceApiService: FaceApiServiceProtocol {
             let url = URL(string: "\(baseURL)/api/face/batch-job")!
             var request = URLRequest(url: url)
             request.httpMethod = "POST"
-            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             
-            // Convert image data to base64
-            let base64String = sourceImageData.base64EncodedString()
-            let dataURL = "data:image/jpeg;base64,\(base64String)"
+            // Create multipart form data
+            let boundary = UUID().uuidString
+            request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
             
-            // Create JSON request body
-            let requestBody: [String: Any] = [
-                "sourceImage": dataURL,
-                "totalBatches": totalTargetCount,
-                "userId": userId,
-                "metadata": [
-                    "sourceImageName": "source.jpg",
-                    "sourceImageType": "image/jpeg"
-                ]
-            ]
+            var body = Data()
             
-            // Convert to JSON data
-            let jsonData = try JSONSerialization.data(withJSONObject: requestBody)
-            request.httpBody = jsonData
+            // Add source image data
+            body.append("--\(boundary)\r\n".data(using: .utf8)!)
+            body.append("Content-Disposition: form-data; name=\"source\"; filename=\"source.jpg\"\r\n".data(using: .utf8)!)
+            body.append("Content-Type: image/jpeg\r\n\r\n".data(using: .utf8)!)
+            body.append(sourceImageData)
+            body.append("\r\n".data(using: .utf8)!)
+            
+            // Add totalBatches field
+            body.append("--\(boundary)\r\n".data(using: .utf8)!)
+            body.append("Content-Disposition: form-data; name=\"totalBatches\"\r\n".data(using: .utf8)!)
+            body.append("Content-Type: text/plain\r\n\r\n".data(using: .utf8)!)
+            body.append("\(totalTargetCount)".data(using: .utf8)!)
+            body.append("\r\n".data(using: .utf8)!)
+            
+            // Add userId field
+            body.append("--\(boundary)\r\n".data(using: .utf8)!)
+            body.append("Content-Disposition: form-data; name=\"userId\"\r\n".data(using: .utf8)!)
+            body.append("Content-Type: text/plain\r\n\r\n".data(using: .utf8)!)
+            body.append("\(userId)".data(using: .utf8)!)
+            body.append("\r\n".data(using: .utf8)!)
+            
+            body.append("--\(boundary)--\r\n".data(using: .utf8)!)
+            
+            request.httpBody = body
             
             if FeatureFlags.enableDebugLogBatchCompare {
                 print("[FaceApiService] Creating batch job for \(totalTargetCount) total targets")
