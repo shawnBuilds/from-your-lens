@@ -862,82 +862,40 @@ class AppState: ObservableObject {
     }
     
     private func convertPhotoToImageData(_ photo: Photo) async -> Data? {
-        if FeatureFlags.enableDebugLogFaceDetection {
-            print("[AppState] Converting photo to image data: \(photo.mediaItemId)")
-            print("[AppState] Photo URL: \(photo.baseUrl)")
-            print("[AppState] Photo ID: \(photo.id)")
-            print("[AppState] Photo userId: \(photo.userId)")
-        }
-        
         // Handle iCloud photos
         if photo.baseUrl.hasPrefix("icloud://") {
-            if FeatureFlags.enableDebugLogFaceDetection {
-                print("[AppState] Processing iCloud photo: \(photo.mediaItemId)")
-                print("[AppState] Extracted mediaItemId from URL: \(photo.mediaItemId)")
-            }
-            
             do {
                 let iCloudService = ICloudPhotoService()
                 guard let asset = try await iCloudService.getPhotoAsset(for: photo) else {
-                    if FeatureFlags.enableDebugLogFaceDetection {
-                        print("[AppState] ❌ Could not find iCloud asset for photo: \(photo.mediaItemId)")
-                        print("[AppState] This will cause face matching to fail")
-                    }
                     return nil
-                }
-                
-                if FeatureFlags.enableDebugLogFaceDetection {
-                    print("[AppState] ✅ Found iCloud asset, loading image data...")
                 }
                 
                 let targetSize = CGSize(width: 1920, height: 1920) // High quality for face detection
                 guard let image = try await iCloudService.loadImageFromAsset(asset, targetSize: targetSize) else {
-                    if FeatureFlags.enableDebugLogFaceDetection {
-                        print("[AppState] ❌ Could not load image from iCloud asset: \(photo.mediaItemId)")
-                    }
                     return nil
                 }
                 
                 // Convert UIImage to Data
                 guard let imageData = image.jpegData(compressionQuality: 0.9) else {
-                    if FeatureFlags.enableDebugLogFaceDetection {
-                        print("[AppState] ❌ Could not convert UIImage to Data for: \(photo.mediaItemId)")
-                    }
                     return nil
-                }
-                
-                if FeatureFlags.enableDebugLogFaceDetection {
-                    print("[AppState] ✅ Successfully loaded iCloud image data: \(photo.mediaItemId), size: \(imageData.count) bytes")
                 }
                 
                 return imageData
                 
             } catch {
-                if FeatureFlags.enableDebugLogFaceDetection {
-                    print("[AppState] ❌ Error loading iCloud image data for \(photo.mediaItemId): \(error)")
-                }
                 return nil
             }
         }
         
         // Handle regular HTTP URLs
         guard let url = URL(string: photo.baseUrl) else {
-            if FeatureFlags.enableDebugLogFaceDetection {
-                print("[AppState] Invalid URL: \(photo.baseUrl)")
-            }
             return nil
         }
         
         do {
             let (data, _) = try await URLSession.shared.data(from: url)
-            if FeatureFlags.enableDebugLogFaceDetection {
-                print("[AppState] Successfully loaded HTTP image data: \(photo.mediaItemId), size: \(data.count) bytes")
-            }
             return data
         } catch {
-            if FeatureFlags.enableDebugLogFaceDetection {
-                print("[AppState] Error converting photo to image data: \(error)")
-            }
             return nil
         }
     }
