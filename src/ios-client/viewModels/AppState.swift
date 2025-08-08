@@ -37,13 +37,6 @@ class AppState: ObservableObject {
     @Published var selectedSourcePhoto: Photo?
     @Published var selectedTargetPhotos: [Photo] = []
     
-    // MARK: - Chunked Batch Compare State
-    @Published var batchJobId: String?
-    @Published var batchJobProgress: Double = 0.0
-    @Published var batchJobStatus: BatchJobStatus = .pending
-    @Published var batchJobEstimatedTimeRemaining: TimeInterval?
-    @Published var isPollingBatchJobStatus: Bool = false
-    
     // MARK: - User Search State
     @Published var allUsers: [User] = []
     @Published var isFetchingUsers: Bool = false
@@ -65,7 +58,6 @@ class AppState: ObservableObject {
     private let photosService = PhotosService()
     private let faceApiService = FaceApiService()
     private let photoDownloadService = PhotoDownloadService()
-    private var batchJobStatusTimer: Timer?
     
     // MARK: - Initialization
     init() {
@@ -128,10 +120,6 @@ class AppState: ObservableObject {
     deinit {
         // Clean up notification observers
         NotificationCenter.default.removeObserver(self)
-        
-        // Clean up batch job status polling (invalidate timer directly)
-        batchJobStatusTimer?.invalidate()
-        batchJobStatusTimer = nil
     }
     
     // MARK: - User Authentication
@@ -426,150 +414,6 @@ class AppState: ObservableObject {
         }
     }
     
-    // MARK: - Chunked Batch Compare Helper Methods
-    
-    private func calculateOptimalChunkSize(for targetPhotos: [Photo]) async -> Int {
-        // Start with the configured chunk size
-        var chunkSize = FeatureFlags.maxBatchChunkSize
-        
-        // If we have fewer photos than the max chunk size, use all of them
-        if targetPhotos.count <= chunkSize {
-            return targetPhotos.count
-        }
-        
-        // Calculate total size of all target photos to determine optimal chunking
-        var totalSize: Int64 = 0
-        var photoSizes: [Int] = []
-        
-        for photo in targetPhotos {
-            if let imageData = await convertPhotoToImageData(photo) {
-                let size = imageData.count
-                totalSize += Int64(size)
-                photoSizes.append(size)
-            }
-        }
-        
-        // If total size is small, we can use larger chunks
-        let averageSize = totalSize / Int64(targetPhotos.count)
-        let maxPhotosPerChunk = Int(FeatureFlags.maxBatchChunkSizeBytes / Int(averageSize))
-        
-        // Use the smaller of: configured chunk size, calculated optimal size, or total photos
-        chunkSize = min(chunkSize, maxPhotosPerChunk, targetPhotos.count)
-        
-        // Ensure minimum chunk size of 1
-        return max(chunkSize, 1)
-    }
-    
-    private func createChunks(from targetPhotos: [Photo], chunkSize: Int) -> [[Photo]] {
-        var chunks: [[Photo]] = []
-        var currentChunk: [Photo] = []
-        
-        for photo in targetPhotos {
-            currentChunk.append(photo)
-            
-            if currentChunk.count >= chunkSize {
-                chunks.append(currentChunk)
-                currentChunk = []
-            }
-        }
-        
-        // Add any remaining photos as the last chunk
-        if !currentChunk.isEmpty {
-            chunks.append(currentChunk)
-        }
-        
-        return chunks
-    }
-    
-    private func startBatchJobStatusPolling() {
-        guard let jobId = batchJobId else { return }
-        
-        isPollingBatchJobStatus = true
-        
-        batchJobStatusTimer = Timer.scheduledTimer(withTimeInterval: FeatureFlags.batchJobStatusPollInterval, repeats: true) { [weak self] _ in
-            Task { @MainActor in
-                await self?.pollBatchJobStatus(jobId: jobId)
-            }
-        }
-        
-        if FeatureFlags.enableDebugLogBatchCompare {
-            print("[AppState] Started polling batch job status for: \(jobId)")
-        }
-    }
-    
-    private func stopBatchJobStatusPolling() {
-        batchJobStatusTimer?.invalidate()
-        batchJobStatusTimer = nil
-        isPollingBatchJobStatus = false
-        
-        if FeatureFlags.enableDebugLogBatchCompare {
-            print("[AppState] Stopped polling batch job status")
-        }
-    }
-    
-    private func pollBatchJobStatus(jobId: String) async {
-        do {
-            let statusResponse = try await faceApiService.getBatchJobStatus(jobId: jobId)
-            
-            await MainActor.run {
-                self.batchJobProgress = statusResponse.progress
-                self.batchJobStatus = statusResponse.job.status
-                self.batchJobEstimatedTimeRemaining = statusResponse.estimatedTimeRemaining
-                
-                // Update overall progress
-                self.batchCompareProgress = statusResponse.progress / 100.0
-                
-                if FeatureFlags.enableDebugLogBatchCompare {
-                    print("[AppState] Batch job status update - Progress: \(statusResponse.progress)%, Status: \(statusResponse.job.status)")
-                }
-                
-                // Check if job is completed
-                if statusResponse.job.status == .completed {
-                    self.handleBatchJobCompletion(statusResponse: statusResponse)
-                } else if statusResponse.job.status == .failed {
-                    self.handleBatchJobFailure(error: "Batch job failed")
-                }
-            }
-            
-        } catch {
-            if FeatureFlags.enableDebugLogBatchCompare {
-                print("[AppState] Error polling batch job status: \(error)")
-            }
-        }
-    }
-    
-    private func handleBatchJobCompletion(statusResponse: BatchJobStatusResponse) {
-        stopBatchJobStatusPolling()
-        
-        // Get all results from the batch job
-        if let summary = statusResponse.summary {
-            if FeatureFlags.enableDebugLogBatchCompare {
-                print("[AppState] Batch job completed - Total processed: \(summary.totalProcessed), Matches: \(summary.totalMatches)")
-            }
-            
-            // Update state
-            batchCompareProgress = 1.0
-            batchCompareState = .matched
-            
-            // Note: The actual results will be aggregated from all chunks
-            // For now, we'll keep the existing results from individual chunks
-        }
-        
-        isBatchComparing = false
-    }
-    
-    private func handleBatchJobFailure(error: String) {
-        stopBatchJobStatusPolling()
-        
-        batchCompareError = error
-        batchCompareState = .error
-        isBatchComparing = false
-        
-        if FeatureFlags.enableDebugLogBatchCompare {
-            print("[AppState] Batch job failed: \(error)")
-        }
-    }
-    
     // MARK: - Batch Compare Methods
     func startBatchCompareWithPermissionCheck(sourcePhoto: Photo, targetPhotos: [Photo]) async -> Bool {
         // Check notification permission first
@@ -612,181 +456,12 @@ class AppState: ObservableObject {
         batchCompareError = nil
         batchCompareState = .matching
         
-        // Reset chunked batch compare state
-        batchJobId = nil
-        batchJobProgress = 0.0
-        batchJobStatus = .pending
-        batchJobEstimatedTimeRemaining = nil
-        stopBatchJobStatusPolling()
-        
         if FeatureFlags.enableDebugLogFaceDetection {
             print("[AppState] Starting batch compare with \(targetPhotos.count) target photos")
         }
         
         if FeatureFlags.enableDebugBatchCompareModal {
             print("[BatchCompareModal] State transition: WAITING → MATCHING")
-        }
-        
-        // Check if chunked processing is enabled
-        if FeatureFlags.enableChunkedBatchCompare && targetPhotos.count > FeatureFlags.maxBatchChunkSize {
-            await startChunkedBatchCompare(sourcePhoto: sourcePhoto, targetPhotos: targetPhotos)
-        } else {
-            await startRegularBatchCompare(sourcePhoto: sourcePhoto, targetPhotos: targetPhotos)
-        }
-    }
-    
-    private func startChunkedBatchCompare(sourcePhoto: Photo, targetPhotos: [Photo]) async {
-        if FeatureFlags.enableDebugLogBatchCompare {
-            print("[AppState] Starting CHUNKED batch compare with \(targetPhotos.count) target photos")
-        }
-        
-        do {
-            // Convert source photo to image data
-            guard let sourceImageData = await convertPhotoToImageData(sourcePhoto) else {
-                batchCompareError = "Failed to load source image"
-                batchCompareState = .error
-                isBatchComparing = false
-                return
-            }
-            
-            // Calculate optimal chunk size
-            let chunkSize = await calculateOptimalChunkSize(for: targetPhotos)
-            let chunks = createChunks(from: targetPhotos, chunkSize: chunkSize)
-            
-            if FeatureFlags.enableDebugLogBatchCompare {
-                print("[AppState] Created \(chunks.count) chunks with \(chunkSize) photos per chunk")
-            }
-            
-            // Create batch job
-            guard let currentUser = currentUser else {
-                batchCompareError = "No current user available"
-                batchCompareState = .error
-                isBatchComparing = false
-                return
-            }
-            
-            let batchJob = try await faceApiService.createBatchJob(
-                sourceImageData: sourceImageData,
-                totalTargetCount: chunks.count,
-                userId: currentUser.id
-            )
-            
-            await MainActor.run {
-                self.batchJobId = batchJob.id
-                self.batchJobStatus = batchJob.status
-            }
-            
-            if FeatureFlags.enableDebugLogBatchCompare {
-                print("[AppState] Created batch job: \(batchJob.id) with \(chunks.count) total chunks")
-            }
-            
-            // Start polling for job status
-            startBatchJobStatusPolling()
-            
-            // Send chunks in parallel (limited by maxConcurrentChunks)
-            let semaphore = DispatchSemaphore(value: FeatureFlags.maxConcurrentChunks)
-            var allResults: [BatchCompareResult] = []
-            var chunkErrors: [Error] = []
-            
-            await withTaskGroup(of: Void.self) { group in
-                for (chunkIndex, chunk) in chunks.enumerated() {
-                    group.addTask {
-                        await semaphore.wait()
-                        defer { semaphore.signal() }
-                        
-                        do {
-                            // Convert chunk photos to image data
-                            var chunkImageData: [Data] = []
-                            var validChunkPhotos: [Photo] = []
-                            
-                            for photo in chunk {
-                                if let imageData = await self.convertPhotoToImageData(photo) {
-                                    chunkImageData.append(imageData)
-                                    validChunkPhotos.append(photo)
-                                }
-                            }
-                            
-                            guard !chunkImageData.isEmpty else {
-                                if FeatureFlags.enableDebugLogBatchCompare {
-                                    print("[AppState] Chunk \(chunkIndex + 1) has no valid images")
-                                }
-                                return
-                            }
-                            
-                            if FeatureFlags.enableDebugLogBatchCompare {
-                                print("[AppState] Sending chunk \(chunkIndex + 1)/\(chunks.count) with \(chunkImageData.count) images")
-                            }
-                            
-                            // Send chunk to server
-                            let chunkResponse = try await self.faceApiService.sendBatchChunk(
-                                jobId: batchJob.id,
-                                sourceImageData: sourceImageData,
-                                targetImageDataArray: chunkImageData
-                            )
-                            
-                            // Map results back to photos
-                            for (index, result) in chunkResponse.results.enumerated() {
-                                guard index < validChunkPhotos.count else { break }
-                                
-                                let targetPhoto = validChunkPhotos[index]
-                                let batchResult = BatchCompareResult(
-                                    targetFileName: result.targetFileName,
-                                    photo: targetPhoto,
-                                    faceMatches: result.faceMatches,
-                                    unmatchedFaces: result.unmatchedFaces,
-                                    sourceFaceCount: result.sourceFaceCount,
-                                    targetFaceCount: result.targetFaceCount,
-                                    error: result.error,
-                                    rejected: result.rejected
-                                )
-                                
-                                await MainActor.run {
-                                    allResults.append(batchResult)
-                                }
-                            }
-                            
-                            if FeatureFlags.enableDebugLogBatchCompare {
-                                print("[AppState] Chunk \(chunkIndex + 1) completed: \(chunkResponse.successfulComparisons) successful, \(chunkResponse.failedComparisons) failed")
-                            }
-                            
-                        } catch {
-                            if FeatureFlags.enableDebugLogBatchCompare {
-                                print("[AppState] Chunk \(chunkIndex + 1) failed: \(error)")
-                            }
-                            await MainActor.run {
-                                chunkErrors.append(error)
-                            }
-                        }
-                    }
-                }
-            }
-            
-            // Update results
-            await MainActor.run {
-                self.batchCompareResults = allResults
-                
-                if FeatureFlags.enableDebugLogBatchCompare {
-                    print("[AppState] Chunked batch compare completed: \(allResults.count) total results, \(chunkErrors.count) chunk errors")
-                }
-            }
-            
-        } catch {
-            await MainActor.run {
-                self.batchCompareError = error.localizedDescription
-                self.batchCompareState = .error
-                self.isBatchComparing = false
-                self.stopBatchJobStatusPolling()
-            }
-            
-            if FeatureFlags.enableDebugLogBatchCompare {
-                print("[AppState] Error during chunked batch compare: \(error)")
-            }
-        }
-    }
-    
-    private func startRegularBatchCompare(sourcePhoto: Photo, targetPhotos: [Photo]) async {
-        if FeatureFlags.enableDebugLogBatchCompare {
-            print("[AppState] Starting REGULAR batch compare with \(targetPhotos.count) target photos")
         }
         
         do {
@@ -964,13 +639,6 @@ class AppState: ObservableObject {
         batchCompareState = .waiting
         selectedTargetUser = nil
         batchCompareMode = .findPhotos
-        
-        // Reset chunked batch compare state
-        batchJobId = nil
-        batchJobProgress = 0.0
-        batchJobStatus = .pending
-        batchJobEstimatedTimeRemaining = nil
-        stopBatchJobStatusPolling()
     }
     
     // MARK: - User Management Methods
@@ -1194,40 +862,82 @@ class AppState: ObservableObject {
     }
     
     private func convertPhotoToImageData(_ photo: Photo) async -> Data? {
+        if FeatureFlags.enableDebugLogFaceDetection {
+            print("[AppState] Converting photo to image data: \(photo.mediaItemId)")
+            print("[AppState] Photo URL: \(photo.baseUrl)")
+            print("[AppState] Photo ID: \(photo.id)")
+            print("[AppState] Photo userId: \(photo.userId)")
+        }
+        
         // Handle iCloud photos
         if photo.baseUrl.hasPrefix("icloud://") {
+            if FeatureFlags.enableDebugLogFaceDetection {
+                print("[AppState] Processing iCloud photo: \(photo.mediaItemId)")
+                print("[AppState] Extracted mediaItemId from URL: \(photo.mediaItemId)")
+            }
+            
             do {
                 let iCloudService = ICloudPhotoService()
                 guard let asset = try await iCloudService.getPhotoAsset(for: photo) else {
+                    if FeatureFlags.enableDebugLogFaceDetection {
+                        print("[AppState] ❌ Could not find iCloud asset for photo: \(photo.mediaItemId)")
+                        print("[AppState] This will cause face matching to fail")
+                    }
                     return nil
+                }
+                
+                if FeatureFlags.enableDebugLogFaceDetection {
+                    print("[AppState] ✅ Found iCloud asset, loading image data...")
                 }
                 
                 let targetSize = CGSize(width: 1920, height: 1920) // High quality for face detection
                 guard let image = try await iCloudService.loadImageFromAsset(asset, targetSize: targetSize) else {
+                    if FeatureFlags.enableDebugLogFaceDetection {
+                        print("[AppState] ❌ Could not load image from iCloud asset: \(photo.mediaItemId)")
+                    }
                     return nil
                 }
                 
                 // Convert UIImage to Data
                 guard let imageData = image.jpegData(compressionQuality: 0.9) else {
+                    if FeatureFlags.enableDebugLogFaceDetection {
+                        print("[AppState] ❌ Could not convert UIImage to Data for: \(photo.mediaItemId)")
+                    }
                     return nil
+                }
+                
+                if FeatureFlags.enableDebugLogFaceDetection {
+                    print("[AppState] ✅ Successfully loaded iCloud image data: \(photo.mediaItemId), size: \(imageData.count) bytes")
                 }
                 
                 return imageData
                 
             } catch {
+                if FeatureFlags.enableDebugLogFaceDetection {
+                    print("[AppState] ❌ Error loading iCloud image data for \(photo.mediaItemId): \(error)")
+                }
                 return nil
             }
         }
         
         // Handle regular HTTP URLs
         guard let url = URL(string: photo.baseUrl) else {
+            if FeatureFlags.enableDebugLogFaceDetection {
+                print("[AppState] Invalid URL: \(photo.baseUrl)")
+            }
             return nil
         }
         
         do {
             let (data, _) = try await URLSession.shared.data(from: url)
+            if FeatureFlags.enableDebugLogFaceDetection {
+                print("[AppState] Successfully loaded HTTP image data: \(photo.mediaItemId), size: \(data.count) bytes")
+            }
             return data
         } catch {
+            if FeatureFlags.enableDebugLogFaceDetection {
+                print("[AppState] Error converting photo to image data: \(error)")
+            }
             return nil
         }
     }
