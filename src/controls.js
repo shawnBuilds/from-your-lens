@@ -15,6 +15,7 @@ const Controls = {
     enableDebugLogOAuth: true,        // Google OAuth flow logs
     enableDebugLogFaceDetection: false, // Face detection/comparison logs
     enableDebugLogBatchCompare: true, // Batch face comparison logs (NEW)
+    enableDebugLogBatchJobService: true, // Batch job service logs (NEW)
     enableDebugLogPhotoUpload: true, // Debug: log photo upload operations
     enableDebugLogAuth: true,         // General auth service logs
     enableDebugLogUser: true,         // User management logs
