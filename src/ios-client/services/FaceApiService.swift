@@ -295,15 +295,13 @@ class FaceApiService: FaceApiServiceProtocol {
             
             // Add totalBatches field
             body.append("--\(boundary)\r\n".data(using: .utf8)!)
-            body.append("Content-Disposition: form-data; name=\"totalBatches\"\r\n".data(using: .utf8)!)
-            body.append("Content-Type: text/plain\r\n\r\n".data(using: .utf8)!)
+            body.append("Content-Disposition: form-data; name=\"totalBatches\"\r\n\r\n".data(using: .utf8)!)
             body.append("\(totalTargetCount)".data(using: .utf8)!)
             body.append("\r\n".data(using: .utf8)!)
             
             // Add userId field
             body.append("--\(boundary)\r\n".data(using: .utf8)!)
-            body.append("Content-Disposition: form-data; name=\"userId\"\r\n".data(using: .utf8)!)
-            body.append("Content-Type: text/plain\r\n\r\n".data(using: .utf8)!)
+            body.append("Content-Disposition: form-data; name=\"userId\"\r\n\r\n".data(using: .utf8)!)
             body.append("\(userId)".data(using: .utf8)!)
             body.append("\r\n".data(using: .utf8)!)
             
@@ -313,6 +311,8 @@ class FaceApiService: FaceApiServiceProtocol {
             
             if FeatureFlags.enableDebugLogBatchCompare {
                 print("[FaceApiService] Creating batch job for \(totalTargetCount) total targets")
+                print("[FaceApiService] Request body size: \(body.count) bytes")
+                print("[FaceApiService] Source image size: \(sourceImageData.count) bytes")
             }
             
             let (data, response) = try await session.data(for: request)
@@ -325,7 +325,10 @@ class FaceApiService: FaceApiServiceProtocol {
                 if FeatureFlags.enableDebugLogBatchCompare {
                     print("[FaceApiService] Batch job creation failed with status code: \(httpResponse.statusCode)")
                     
-                    
+                    // Try to read error response
+                    if let errorData = data, let errorString = String(data: errorData, encoding: .utf8) {
+                        print("[FaceApiService] Server error response: \(errorString)")
+                    }
                 }
                 throw FaceApiServiceError.serverError
             }
