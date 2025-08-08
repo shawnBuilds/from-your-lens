@@ -8,13 +8,9 @@ const {
 } = require("@aws-sdk/client-rekognition");
 const { rekClient } = require("../lib/rekognitionClient");
 const Controls = require("../controls");
-const { BatchJobService } = require("../services/batchJobService");
 
 const upload = multer();     // in-memory storage
 const router = express.Router();
-
-// Initialize batch job service
-const batchJobService = new BatchJobService();
 
 // AWS Rekognition limits
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB
@@ -77,50 +73,6 @@ async function compareFaces(sourceBuffer, targetBuffer, sourceName, targetName) 
       error: err.message
     };
   }
-}
-
-// Helper function to process target images (used for both regular and chunked processing)
-async function processTargetImages(sourceBuffer, targetFiles, sourceFaces) {
-  const comparisonPromises = targetFiles.map(async (targetFile) => {
-    // Detect faces in target image
-    const targetFaces = await detectFacesInImage(targetFile.buffer, targetFile.originalname);
-    
-    if (!targetFaces || targetFaces.length === 0) {
-      if (Controls.enableDebugLogBatchCompare) {
-        console.log(`[BatchCompare] ⚠️  No faces detected in ${targetFile.originalname}`);
-      }
-      return {
-        targetFileName: targetFile.originalname,
-        success: true, // This is a successful comparison, just no faces found
-        FaceMatches: [],
-        UnmatchedFaces: [],
-        sourceFaceCount: sourceFaces.length,
-        targetFaceCount: 0,
-        error: null // No error, just no faces detected
-      };
-    }
-
-    // Compare faces
-    const comparisonResult = await compareFaces(
-      sourceBuffer, 
-      targetFile.buffer, 
-      "source", 
-      targetFile.originalname
-    );
-
-    return {
-      targetFileName: targetFile.originalname,
-      success: comparisonResult.success,
-      FaceMatches: comparisonResult.FaceMatches,
-      UnmatchedFaces: comparisonResult.UnmatchedFaces,
-      sourceFaceCount: sourceFaces.length,
-      targetFaceCount: targetFaces.length,
-      error: comparisonResult.error
-    };
-  });
-
-  // Wait for all comparisons to complete
-  return await Promise.all(comparisonPromises);
 }
 
 // POST /api/face/detect
@@ -350,8 +302,7 @@ router.post(
   "/batch-compare",
   upload.fields([
     { name: "source", maxCount: 1 },
-    { name: "targets", maxCount: Controls.maxBatchCompareTargets },
-    { name: "jobId", maxCount: 1 } // Optional: for chunked processing
+    { name: "targets", maxCount: Controls.maxBatchCompareTargets }
   ]),
   async (req, res) => {
     if (Controls.enableDebugLogBatchCompare) {
@@ -368,8 +319,6 @@ router.post(
 
       const sourceFile = req.files.source?.[0];
       const targetFiles = req.files.targets || [];
-      const jobIdField = req.files.jobId?.[0];
-      const jobId = jobIdField ? jobIdField.buffer.toString() : null;
 
       if (Controls.enableDebugLogBatchCompare) {
         console.log("\n[BatchCompare] Request Details:");
@@ -469,72 +418,7 @@ router.post(
         }
       }
 
-      // Handle chunked processing if jobId is provided
-      if (jobId) {
-        if (Controls.enableDebugLogBatchCompare) {
-          console.log(`[BatchCompare] Processing chunk for job: ${jobId}`);
-        }
-        
-        // Get the batch job
-        const batchJob = batchJobService.getBatchJob(jobId);
-        if (!batchJob) {
-          console.error(`[BatchCompare] Batch job not found: ${jobId}`);
-          return res.status(404).json({ error: "Batch job not found" });
-        }
-        
-        // Use the source image from the batch job
-        const sourceImageData = batchJob.sourceImageData;
-        if (!sourceImageData) {
-          console.error(`[BatchCompare] No source image data in batch job: ${jobId}`);
-          return res.status(400).json({ error: "No source image data in batch job" });
-        }
-        
-        // Detect faces in source image from batch job
-        if (Controls.enableDebugLogBatchCompare) {
-          console.log("\n[BatchCompare] Detecting faces in source image from batch job...");
-        }
-        
-        const sourceFaces = await detectFacesInImage(sourceImageData, "source_from_job");
-        
-        if (!sourceFaces || sourceFaces.length === 0) {
-          console.error("[BatchCompare] No faces detected in source image from batch job");
-          return res.status(400).json({
-            error: "No faces detected in source image from batch job"
-          });
-        }
-        
-        if (Controls.enableDebugLogBatchCompare) {
-          console.log(`[BatchCompare] Found ${sourceFaces.length} faces in source image from batch job`);
-          console.log("\n[BatchCompare] Starting chunk processing...");
-        }
-        
-        // Process this chunk and update the batch job
-        const chunkResults = await processTargetImages(sourceImageData, targetFiles, sourceFaces);
-        
-        // Update batch job progress
-        const currentCompletedBatches = batchJob.completedBatches + 1;
-        batchJobService.updateBatchJobProgress(jobId, currentCompletedBatches, chunkResults);
-        
-        if (Controls.enableDebugLogBatchCompare) {
-          console.log(`[BatchCompare] Chunk completed for job ${jobId}. Progress: ${currentCompletedBatches}/${batchJob.totalBatches}`);
-        }
-        
-        // Return chunk results
-        res.json({
-          jobId: jobId,
-          chunkResults: chunkResults,
-          totalProcessed: chunkResults.length,
-          successfulComparisons: chunkResults.filter(r => r.success).length,
-          failedComparisons: chunkResults.filter(r => !r.success).length,
-          totalMatches: chunkResults.reduce((sum, r) => sum + r.FaceMatches.length, 0),
-          sourceFaceCount: sourceFaces.length,
-          isChunk: true
-        });
-        
-        return;
-      }
-      
-      // Regular batch processing (non-chunked)
+      // Detect faces in source image first
       if (Controls.enableDebugLogBatchCompare) {
         console.log("\n[BatchCompare] Detecting faces in source image...");
       }
@@ -559,7 +443,46 @@ router.post(
       }
 
       // Process all target images in parallel
-      const results = await processTargetImages(sourceFile.buffer, targetFiles, sourceFaces);
+      const comparisonPromises = targetFiles.map(async (targetFile) => {
+        // Detect faces in target image
+        const targetFaces = await detectFacesInImage(targetFile.buffer, targetFile.originalname);
+        
+        if (!targetFaces || targetFaces.length === 0) {
+          if (Controls.enableDebugLogBatchCompare) {
+            console.log(`[BatchCompare] ⚠️  No faces detected in ${targetFile.originalname}`);
+          }
+          return {
+            targetFileName: targetFile.originalname,
+            success: true, // This is a successful comparison, just no faces found
+            FaceMatches: [],
+            UnmatchedFaces: [],
+            sourceFaceCount: sourceFaces.length,
+            targetFaceCount: 0,
+            error: null // No error, just no faces detected
+          };
+        }
+
+        // Compare faces
+        const comparisonResult = await compareFaces(
+          sourceFile.buffer, 
+          targetFile.buffer, 
+          sourceFile.originalname, 
+          targetFile.originalname
+        );
+
+        return {
+          targetFileName: targetFile.originalname,
+          success: comparisonResult.success,
+          FaceMatches: comparisonResult.FaceMatches,
+          UnmatchedFaces: comparisonResult.UnmatchedFaces,
+          sourceFaceCount: sourceFaces.length,
+          targetFaceCount: targetFaces.length,
+          error: comparisonResult.error
+        };
+      });
+
+      // Wait for all comparisons to complete
+      const results = await Promise.all(comparisonPromises);
       
       // Calculate summary statistics
       const successfulComparisons = results.filter(r => r.success).length;
@@ -612,172 +535,5 @@ router.post(
     }
   }
 );
-
-// POST /api/face/batch-job
-router.post("/batch-job", upload.fields([
-  { name: "source", maxCount: 1 },
-  { name: "totalBatches", maxCount: 1 },
-  { name: "userId", maxCount: 1 }
-]), async (req, res) => {
-  if (Controls.enableDebugLogBatchJobService) {
-    console.log("[BatchJob] Creating new batch job request");
-  }
-  
-  try {
-    // Validate request structure
-    if (!req.files) {
-      console.error("[BatchJob] No files received in request");
-      return res.status(400).json({ error: "No files received" });
-    }
-
-    const sourceFile = req.files.source?.[0];
-    const totalBatchesField = req.files.totalBatches?.[0];
-    const userIdField = req.files.userId?.[0];
-
-    if (!sourceFile?.buffer || !totalBatchesField?.buffer || !userIdField?.buffer) {
-      console.error("[BatchJob] Missing required fields");
-      return res.status(400).json({ error: "Missing required fields: source, totalBatches, userId" });
-    }
-
-    const totalBatches = parseInt(totalBatchesField.buffer.toString());
-    const userId = parseInt(userIdField.buffer.toString());
-
-    if (isNaN(totalBatches) || totalBatches <= 0) {
-      console.error("[BatchJob] Invalid totalBatches value");
-      return res.status(400).json({ error: "Invalid totalBatches value" });
-    }
-
-    if (isNaN(userId) || userId <= 0) {
-      console.error("[BatchJob] Invalid userId value");
-      return res.status(400).json({ error: "Invalid userId value" });
-    }
-
-    // Validate source image
-    if (sourceFile.size > MAX_IMAGE_SIZE) {
-      console.error("[BatchJob] Source image too large");
-      return res.status(400).json({ 
-        error: "Source image size exceeds 5MB limit",
-        details: { sourceSize: sourceFile.size, maxAllowed: MAX_IMAGE_SIZE }
-      });
-    }
-
-    if (sourceFile.size < MIN_IMAGE_SIZE) {
-      console.error("[BatchJob] Source image too small");
-      return res.status(400).json({ 
-        error: "Source image size below minimum threshold",
-        details: { sourceSize: sourceFile.size, minRequired: MIN_IMAGE_SIZE }
-      });
-    }
-
-    // Detect faces in source image to validate it
-    const sourceFaces = await detectFacesInImage(sourceFile.buffer, sourceFile.originalname);
-    
-    if (!sourceFaces || sourceFaces.length === 0) {
-      console.error("[BatchJob] No faces detected in source image");
-      return res.status(400).json({
-        error: "No faces detected in source image",
-        details: {
-          imageName: sourceFile.originalname,
-          imageSize: sourceFile.size,
-          imageType: sourceFile.mimetype
-        }
-      });
-    }
-
-    // Create batch job
-    const batchJob = batchJobService.createBatchJob(
-      userId, 
-      sourceFile.buffer, 
-      totalBatches,
-      {
-        sourceImageName: sourceFile.originalname,
-        sourceImageSize: sourceFile.size,
-        sourceImageType: sourceFile.mimetype,
-        sourceFaceCount: sourceFaces.length
-      }
-    );
-
-    if (Controls.enableDebugLogBatchJobService) {
-      console.log(`[BatchJob] Created batch job: ${batchJob.id} for user ${userId} with ${totalBatches} batches`);
-    }
-
-    res.json({
-      jobId: batchJob.id,
-      userId: batchJob.userId,
-      totalBatches: batchJob.totalBatches,
-      status: batchJob.status,
-      createdAt: batchJob.createdAt,
-      sourceFaceCount: sourceFaces.length
-    });
-
-  } catch (err) {
-    console.error("[BatchJob] Error creating batch job:", err);
-    res.status(500).json({ 
-      error: "Failed to create batch job",
-      details: err.message 
-    });
-  }
-});
-
-// GET /api/face/batch-status/:jobId
-router.get("/batch-status/:jobId", async (req, res) => {
-  if (Controls.enableDebugLogBatchJobService) {
-    console.log(`[BatchStatus] Status request for job: ${req.params.jobId}`);
-  }
-  
-  try {
-    const { jobId } = req.params;
-    
-    if (!jobId) {
-      return res.status(400).json({ error: "Job ID is required" });
-    }
-    
-    const status = batchJobService.getBatchJobStatus(jobId);
-    
-    if (!status) {
-      if (Controls.enableDebugLogBatchJobService) {
-        console.log(`[BatchStatus] Job not found: ${jobId}`);
-      }
-      return res.status(404).json({ error: "Batch job not found" });
-    }
-    
-    if (Controls.enableDebugLogBatchJobService) {
-      console.log(`[BatchStatus] Job ${jobId} status: ${status.job.status}, progress: ${status.progress.toFixed(1)}%`);
-    }
-    
-    res.json(status);
-    
-  } catch (err) {
-    console.error("[BatchStatus] Error getting batch job status:", err);
-    res.status(500).json({ 
-      error: "Failed to get batch job status",
-      details: err.message 
-    });
-  }
-});
-
-// GET /api/face/batch-stats
-router.get("/batch-stats", async (req, res) => {
-  if (Controls.enableDebugLogBatchJobService) {
-    console.log("[BatchStats] Stats request received");
-  }
-  
-  try {
-    const stats = batchJobService.getStats();
-    
-    if (Controls.enableDebugLogBatchJobService) {
-      console.log(`[BatchStats] Current stats:`, stats);
-    }
-    
-    res.json(stats);
-    
-  } catch (err) {
-    console.error("[BatchStats] Error getting batch job stats:", err);
-    res.status(500).json({ 
-      error: "Failed to get batch job stats",
-      details: err.message 
-    });
-  }
-});
 
 module.exports = router; 
