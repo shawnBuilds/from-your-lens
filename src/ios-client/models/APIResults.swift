@@ -142,12 +142,23 @@ struct BatchJob: Codable {
     let totalBatches: Int
     let completedBatches: Int
     let status: BatchJobStatus
-    let createdAt: Date
-    let updatedAt: Date
+    let createdAt: String  // Changed from Date to String
+    let updatedAt: String  // Changed from Date to String
     let metadata: [String: String]?
     
     enum CodingKeys: String, CodingKey {
         case id, userId, totalBatches, completedBatches, status, createdAt, updatedAt, metadata
+    }
+    
+    // Computed properties to convert strings to Date when needed
+    var createdAtDate: Date? {
+        let formatter = ISO8601DateFormatter()
+        return formatter.date(from: createdAt)
+    }
+    
+    var updatedAtDate: Date? {
+        let formatter = ISO8601DateFormatter()
+        return formatter.date(from: updatedAt)
     }
     
     // Manual initializer for creating instances
@@ -157,8 +168,10 @@ struct BatchJob: Codable {
         self.totalBatches = totalBatches
         self.completedBatches = completedBatches
         self.status = status
-        self.createdAt = createdAt
-        self.updatedAt = updatedAt
+        // Convert Date to ISO8601 string
+        let formatter = ISO8601DateFormatter()
+        self.createdAt = formatter.string(from: createdAt)
+        self.updatedAt = formatter.string(from: updatedAt)
         self.metadata = metadata
     }
     
@@ -169,8 +182,8 @@ struct BatchJob: Codable {
         totalBatches = try container.decode(Int.self, forKey: .totalBatches)
         completedBatches = try container.decode(Int.self, forKey: .completedBatches)
         status = try container.decode(BatchJobStatus.self, forKey: .status)
-        createdAt = try container.decode(Date.self, forKey: .createdAt)
-        updatedAt = try container.decode(Date.self, forKey: .updatedAt)
+        createdAt = try container.decode(String.self, forKey: .createdAt)
+        updatedAt = try container.decode(String.self, forKey: .updatedAt)
         metadata = try container.decodeIfPresent([String: String].self, forKey: .metadata)
     }
 }
@@ -232,8 +245,14 @@ struct BatchJobCreationResponse: Codable {
     let userId: Int
     let totalBatches: Int
     let status: String
-    let createdAt: Date
+    let createdAt: String  // Changed from Date to String
     let sourceFaceCount: Int
+    
+    // Computed property to convert string to Date when needed
+    var createdAtDate: Date? {
+        let formatter = ISO8601DateFormatter()
+        return formatter.date(from: createdAt)
+    }
 }
 
 // MARK: - Chunked Batch Compare Response
