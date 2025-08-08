@@ -135,6 +135,119 @@ struct BatchCompareResponse {
     )
 }
 
+// MARK: - Batch Job Models
+struct BatchJob: Codable {
+    let id: String
+    let userId: Int
+    let totalBatches: Int
+    let completedBatches: Int
+    let status: BatchJobStatus
+    let createdAt: Date
+    let updatedAt: Date
+    let metadata: [String: String]?
+    
+    enum CodingKeys: String, CodingKey {
+        case id, userId, totalBatches, completedBatches, status, createdAt, updatedAt, metadata
+    }
+    
+    // Manual initializer for creating instances
+    init(id: String, userId: Int, totalBatches: Int, completedBatches: Int, status: BatchJobStatus, createdAt: Date, updatedAt: Date, metadata: [String: String]?) {
+        self.id = id
+        self.userId = userId
+        self.totalBatches = totalBatches
+        self.completedBatches = completedBatches
+        self.status = status
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+        self.metadata = metadata
+    }
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        userId = try container.decode(Int.self, forKey: .userId)
+        totalBatches = try container.decode(Int.self, forKey: .totalBatches)
+        completedBatches = try container.decode(Int.self, forKey: .completedBatches)
+        status = try container.decode(BatchJobStatus.self, forKey: .status)
+        createdAt = try container.decode(Date.self, forKey: .createdAt)
+        updatedAt = try container.decode(Date.self, forKey: .updatedAt)
+        metadata = try container.decodeIfPresent([String: String].self, forKey: .metadata)
+    }
+}
+
+enum BatchJobStatus: String, Codable {
+    case pending = "PENDING"
+    case processing = "PROCESSING"
+    case completed = "COMPLETED"
+    case failed = "FAILED"
+}
+
+struct BatchJobStatusResponse: Codable {
+    let job: BatchJob
+    let progress: Double
+    let estimatedTimeRemaining: TimeInterval?
+    let summary: BatchJobSummary?
+    
+    enum CodingKeys: String, CodingKey {
+        case job, progress, estimatedTimeRemaining, summary
+    }
+    
+    // Manual initializer for creating instances
+    init(job: BatchJob, progress: Double, estimatedTimeRemaining: TimeInterval?, summary: BatchJobSummary?) {
+        self.job = job
+        self.progress = progress
+        self.estimatedTimeRemaining = estimatedTimeRemaining
+        self.summary = summary
+    }
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        job = try container.decode(BatchJob.self, forKey: .job)
+        progress = try container.decode(Double.self, forKey: .progress)
+        estimatedTimeRemaining = try container.decodeIfPresent(TimeInterval.self, forKey: .estimatedTimeRemaining)
+        summary = try container.decodeIfPresent(BatchJobSummary.self, forKey: .summary)
+    }
+}
+
+struct BatchJobSummary: Codable {
+    let totalProcessed: Int
+    let successfulComparisons: Int
+    let failedComparisons: Int
+    let totalMatches: Int
+    let sourceFaceCount: Int
+    
+    // Manual initializer for creating instances
+    init(totalProcessed: Int, successfulComparisons: Int, failedComparisons: Int, totalMatches: Int, sourceFaceCount: Int) {
+        self.totalProcessed = totalProcessed
+        self.successfulComparisons = successfulComparisons
+        self.failedComparisons = failedComparisons
+        self.totalMatches = totalMatches
+        self.sourceFaceCount = sourceFaceCount
+    }
+}
+
+// MARK: - Batch Job Creation Response
+struct BatchJobCreationResponse: Codable {
+    let jobId: String
+    let userId: Int
+    let totalBatches: Int
+    let status: String
+    let createdAt: Date
+    let sourceFaceCount: Int
+}
+
+// MARK: - Chunked Batch Compare Response
+struct ChunkedBatchCompareResponse: Codable {
+    let jobId: String
+    let chunkResults: [BatchCompareResult]
+    let totalProcessed: Int
+    let successfulComparisons: Int
+    let failedComparisons: Int
+    let totalMatches: Int
+    let sourceFaceCount: Int
+    let isChunk: Bool
+}
+
 struct FaceDetail: Codable {
     let boundingBox: BoundingBox
     let confidence: Double

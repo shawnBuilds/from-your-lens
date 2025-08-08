@@ -5,6 +5,11 @@ protocol FaceApiServiceProtocol {
     func detectFacesWithApi(imageData: Data) async throws -> FaceDetectionResult
     func compareFacesWithApi(sourceImageData: Data, targetImageData: Data) async throws -> FaceComparisonResult
     func batchCompareFacesWithApi(sourceImageData: Data, targetImageDataArray: [Data]) async throws -> BatchCompareResponse
+    
+    // MARK: - Chunked Batch Compare Methods
+    func createBatchJob(sourceImageData: Data, totalTargetCount: Int, userId: Int) async throws -> BatchJob
+    func sendBatchChunk(jobId: String, sourceImageData: Data, targetImageDataArray: [Data]) async throws -> BatchCompareResponse
+    func getBatchJobStatus(jobId: String) async throws -> BatchJobStatusResponse
 }
 
 class FaceApiService: FaceApiServiceProtocol {
@@ -240,6 +245,288 @@ class FaceApiService: FaceApiServiceProtocol {
                 print("[FaceApiService] Batch compare error: \(error)")
             }
             return BatchCompareResponse.mockError
+        }
+    }
+    
+    // MARK: - Chunked Batch Compare Methods
+    
+    func createBatchJob(sourceImageData: Data, totalTargetCount: Int, userId: Int) async throws -> BatchJob {
+        // Check if face detection is enabled
+        if !FeatureFlags.enableFaceDetectionUsage {
+            // Return mock batch job for testing
+            return BatchJob(
+                id: "mock_batch_job_123",
+                userId: 1,
+                totalBatches: 1,
+                completedBatches: 0,
+                status: BatchJobStatus.pending,
+                createdAt: Date(),
+                updatedAt: Date(),
+                metadata: ["mock": "true"]
+            )
+        }
+        
+        // Validate source image data size
+        guard sourceImageData.count >= FeatureFlags.minImageSizeForFaceDetection else {
+            throw FaceApiServiceError.imageTooSmall
+        }
+        
+        guard sourceImageData.count <= FeatureFlags.maxImageSizeForFaceDetection else {
+            throw FaceApiServiceError.imageTooLarge
+        }
+        
+        do {
+            let url = URL(string: "\(baseURL)/api/face/batch-job")!
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            
+            // Create multipart form data
+            let boundary = UUID().uuidString
+            request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+            
+            var body = Data()
+            
+            // Add source image data
+            body.append("--\(boundary)\r\n".data(using: .utf8)!)
+            body.append("Content-Disposition: form-data; name=\"source\"; filename=\"source.jpg\"\r\n".data(using: .utf8)!)
+            body.append("Content-Type: image/jpeg\r\n\r\n".data(using: .utf8)!)
+            body.append(sourceImageData)
+            body.append("\r\n".data(using: .utf8)!)
+            
+            // Add totalBatches field
+            body.append("--\(boundary)\r\n".data(using: .utf8)!)
+            body.append("Content-Disposition: form-data; name=\"totalBatches\"\r\n\r\n".data(using: .utf8)!)
+            body.append("\(totalTargetCount)".data(using: .utf8)!)
+            body.append("\r\n".data(using: .utf8)!)
+            
+            // Add userId field
+            body.append("--\(boundary)\r\n".data(using: .utf8)!)
+            body.append("Content-Disposition: form-data; name=\"userId\"\r\n\r\n".data(using: .utf8)!)
+            body.append("\(userId)".data(using: .utf8)!)
+            body.append("\r\n".data(using: .utf8)!)
+            
+            body.append("--\(boundary)--\r\n".data(using: .utf8)!)
+            
+            request.httpBody = body
+            
+            if FeatureFlags.enableDebugLogBatchCompare {
+                print("[FaceApiService] Creating batch job for \(totalTargetCount) total targets")
+                print("[FaceApiService] Request body size: \(body.count) bytes")
+                print("[FaceApiService] Source image size: \(sourceImageData.count) bytes")
+            }
+            
+            let (data, response) = try await session.data(for: request)
+            
+            guard let httpResponse = response as? HTTPURLResponse else {
+                throw FaceApiServiceError.invalidResponse
+            }
+            
+            guard httpResponse.statusCode == 200 else {
+                if FeatureFlags.enableDebugLogBatchCompare {
+                    print("[FaceApiService] Batch job creation failed with status code: \(httpResponse.statusCode)")
+                    
+                    // Try to read error response
+                    if let errorData = data, let errorString = String(data: errorData, encoding: .utf8) {
+                        print("[FaceApiService] Server error response: \(errorString)")
+                    }
+                }
+                throw FaceApiServiceError.serverError
+            }
+            
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+            
+            let creationResponse = try decoder.decode(BatchJobCreationResponse.self, from: data)
+            
+            // Create BatchJob from response
+            let batchJob = BatchJob(
+                id: creationResponse.jobId,
+                userId: creationResponse.userId,
+                totalBatches: creationResponse.totalBatches,
+                completedBatches: 0,
+                status: BatchJobStatus(rawValue: creationResponse.status) ?? BatchJobStatus.pending,
+                createdAt: creationResponse.createdAt,
+                updatedAt: creationResponse.createdAt,
+                metadata: ["sourceFaceCount": "\(creationResponse.sourceFaceCount)"]
+            )
+            
+            if FeatureFlags.enableDebugLogBatchCompare {
+                print("[FaceApiService] Created batch job: \(batchJob.id)")
+            }
+            
+            return batchJob
+            
+        } catch {
+            if FeatureFlags.enableDebugLogBatchCompare {
+                print("[FaceApiService] Error creating batch job: \(error)")
+            }
+            throw error
+        }
+    }
+    
+    func sendBatchChunk(jobId: String, sourceImageData: Data, targetImageDataArray: [Data]) async throws -> BatchCompareResponse {
+        // Check if face detection is enabled
+        if !FeatureFlags.enableFaceDetectionUsage {
+            return BatchCompareResponse.mockResponse
+        }
+        
+        // Validate target images
+        guard !targetImageDataArray.isEmpty else {
+            return BatchCompareResponse.mockError
+        }
+        
+        for targetImageData in targetImageDataArray {
+            guard targetImageData.count >= FeatureFlags.minImageSizeForFaceDetection else {
+                return BatchCompareResponse.mockError
+            }
+            
+            guard targetImageData.count <= FeatureFlags.maxImageSizeForFaceDetection else {
+                return BatchCompareResponse.mockError
+            }
+        }
+        
+        do {
+            let url = URL(string: "\(baseURL)/api/face/batch-compare")!
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            
+            // Create multipart form data
+            let boundary = UUID().uuidString
+            request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+            
+            var body = Data()
+            
+            // Add source image data
+            body.append("--\(boundary)\r\n".data(using: .utf8)!)
+            body.append("Content-Disposition: form-data; name=\"source\"; filename=\"source.jpg\"\r\n".data(using: .utf8)!)
+            body.append("Content-Type: image/jpeg\r\n\r\n".data(using: .utf8)!)
+            body.append(sourceImageData)
+            body.append("\r\n".data(using: .utf8)!)
+            
+            // Add all target image data
+            for (index, targetImageData) in targetImageDataArray.enumerated() {
+                body.append("--\(boundary)\r\n".data(using: .utf8)!)
+                body.append("Content-Disposition: form-data; name=\"targets\"; filename=\"target\(index).jpg\"\r\n".data(using: .utf8)!)
+                body.append("Content-Type: image/jpeg\r\n\r\n".data(using: .utf8)!)
+                body.append(targetImageData)
+                body.append("\r\n".data(using: .utf8)!)
+            }
+            
+            // Add jobId field
+            body.append("--\(boundary)\r\n".data(using: .utf8)!)
+            body.append("Content-Disposition: form-data; name=\"jobId\"\r\n\r\n".data(using: .utf8)!)
+            body.append(jobId.data(using: .utf8)!)
+            body.append("\r\n".data(using: .utf8)!)
+            
+            body.append("--\(boundary)--\r\n".data(using: .utf8)!)
+            
+            request.httpBody = body
+            
+            if FeatureFlags.enableDebugLogBatchCompare {
+                print("[FaceApiService] Sending batch chunk for job \(jobId) with \(targetImageDataArray.count) target images")
+            }
+            
+            let (data, response) = try await session.data(for: request)
+            
+            guard let httpResponse = response as? HTTPURLResponse else {
+                return BatchCompareResponse.mockError
+            }
+            
+            guard httpResponse.statusCode == 200 else {
+                if FeatureFlags.enableDebugLogBatchCompare {
+                    print("[FaceApiService] Batch chunk failed with status code: \(httpResponse.statusCode)")
+                }
+                return BatchCompareResponse.mockError
+            }
+            
+            let decoder = JSONDecoder()
+            let chunkResponse = try decoder.decode(ChunkedBatchCompareResponse.self, from: data)
+            
+            if FeatureFlags.enableDebugLogBatchCompare {
+                print("[FaceApiService] Batch chunk completed: \(chunkResponse.successfulComparisons) successful, \(chunkResponse.failedComparisons) failed")
+            }
+            
+            return BatchCompareResponse(
+                results: chunkResponse.chunkResults,
+                totalProcessed: chunkResponse.totalProcessed,
+                successfulComparisons: chunkResponse.successfulComparisons,
+                failedComparisons: chunkResponse.failedComparisons,
+                error: nil
+            )
+            
+        } catch {
+            if FeatureFlags.enableDebugLogBatchCompare {
+                print("[FaceApiService] Batch chunk error: \(error)")
+            }
+            return BatchCompareResponse.mockError
+        }
+    }
+    
+    func getBatchJobStatus(jobId: String) async throws -> BatchJobStatusResponse {
+        // Check if face detection is enabled
+        if !FeatureFlags.enableFaceDetectionUsage {
+            // Return mock status for testing
+            return BatchJobStatusResponse(
+                job: BatchJob(
+                    id: jobId,
+                    userId: 1,
+                    totalBatches: 5,
+                    completedBatches: 2,
+                    status: BatchJobStatus.processing,
+                    createdAt: Date(),
+                    updatedAt: Date(),
+                    metadata: ["mock": "true"]
+                ),
+                progress: 40.0,
+                estimatedTimeRemaining: 180.0,
+                summary: BatchJobSummary(
+                    totalProcessed: 40,
+                    successfulComparisons: 38,
+                    failedComparisons: 2,
+                    totalMatches: 15,
+                    sourceFaceCount: 1
+                )
+            )
+        }
+        
+        do {
+            let url = URL(string: "\(baseURL)/api/face/batch-status/\(jobId)")!
+            var request = URLRequest(url: url)
+            request.httpMethod = "GET"
+            
+            if FeatureFlags.enableDebugLogBatchCompare {
+                print("[FaceApiService] Getting batch job status for: \(jobId)")
+            }
+            
+            let (data, response) = try await session.data(for: request)
+            
+            guard let httpResponse = response as? HTTPURLResponse else {
+                throw FaceApiServiceError.invalidResponse
+            }
+            
+            guard httpResponse.statusCode == 200 else {
+                if FeatureFlags.enableDebugLogBatchCompare {
+                    print("[FaceApiService] Batch job status failed with status code: \(httpResponse.statusCode)")
+                }
+                throw FaceApiServiceError.serverError
+            }
+            
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+            
+            let statusResponse = try decoder.decode(BatchJobStatusResponse.self, from: data)
+            
+            if FeatureFlags.enableDebugLogBatchCompare {
+                print("[FaceApiService] Batch job status: \(statusResponse.job.status), progress: \(statusResponse.progress)%")
+            }
+            
+            return statusResponse
+            
+        } catch {
+            if FeatureFlags.enableDebugLogBatchCompare {
+                print("[FaceApiService] Error getting batch job status: \(error)")
+            }
+            throw error
         }
     }
 }

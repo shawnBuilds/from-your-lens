@@ -27,6 +27,13 @@ struct FeatureFlags {
     static let maxTargetPhotoSelection = 50 // Maximum number of target photos that can be selected for batch comparison
     static let showCompareModalOnFindPhotosClick = false // Show batch compare modal when "Find Photos" is clicked
     static let inviteAppLink = "https://testflight.apple.com/join/INVITE_CODE_TODO" // Placeholder TestFlight link for invite sharing
+    
+    // MARK: - Chunked Batch Compare Configuration
+    static let enableChunkedBatchCompare = true // Feature flag for chunked processing
+    static let maxBatchChunkSize = 20 // Max images per chunk
+    static let maxBatchChunkSizeBytes = 25 * 1024 * 1024 // 25MB per chunk (leaving 5MB buffer)
+    static let maxConcurrentChunks = 5 // Maximum number of chunks to send in parallel
+    static let batchJobStatusPollInterval: TimeInterval = 3.0 // Poll job status every 3 seconds
 
     // MARK: - Debug Logging Flags
     static let enableDebugLogSkipAuth = false // Debug: log state changes for skip auth/test data
@@ -36,9 +43,10 @@ struct FeatureFlags {
     static let enableDebugLogICloudPhotos = false // Debug: log iCloud photo operations
     static let enableDebugLogServerPhotos = false // Debug: log server photo operations
     static let enableDebugLogFaceDetection = true // Debug: log face detection operations
-    static let enableDebugBatchCompareModal = true // Debug: log batch compare modal operations
+    static let enableDebugBatchCompareModal = false // Debug: log batch compare modal operations
     static let enableDebugLogNotifications = false // Debug: log notification operations
     static let enableDebugLogBatchCompare = true // Debug: log batch compare API operations (NEW)
+    static let enableDebugLogChunkedBatchCompare = true // Debug: log chunked batch compare operations (NEW)
     static let enableDebugLogPhotoUpload = false // Debug: log photo upload operations
     static let enableDebugLogPhotoDownload = false // Debug: log photo download operations
     static let enableDebugLogOAuth = false // Debug: log OAuth operations and network requests
