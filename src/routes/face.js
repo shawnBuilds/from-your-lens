@@ -614,95 +614,118 @@ router.post(
 );
 
 // POST /api/face/batch-job
-router.post("/batch-job", upload.fields([
-  { name: "source", maxCount: 1 },
-  { name: "totalBatches", maxCount: 1 },
-  { name: "userId", maxCount: 1 }
-]), async (req, res) => {
+router.post("/batch-job", async (req, res) => {
   if (Controls.enableDebugLogBatchJobService) {
     console.log("[BatchJob] Creating new batch job request");
   }
   
   try {
-    // Validate request structure
-    if (!req.files) {
-      console.error("[BatchJob] No files received in request");
-      return res.status(400).json({ error: "No files received" });
+    // Validate request body
+    if (!req.body) {
+      console.error("[BatchJob] No request body received");
+      return res.status(400).json({ error: "No request body received" });
     }
 
-    const sourceFile = req.files.source?.[0];
-    const totalBatchesField = req.files.totalBatches?.[0];
-    const userIdField = req.files.userId?.[0];
+    const { sourceImage, totalBatches, userId, metadata } = req.body;
     
     if (Controls.enableDebugLogBatchJobService) {
-      console.log("[BatchJob] Fields received - Source:", !!sourceFile, "TotalBatches:", !!totalBatchesField, "UserId:", !!userIdField);
+      console.log("[BatchJob] Fields received - SourceImage:", !!sourceImage, "TotalBatches:", !!totalBatches, "UserId:", !!userId);
     }
 
-    if (!sourceFile?.buffer || !totalBatchesField?.buffer || !userIdField?.buffer) {
-      console.error("[BatchJob] Missing required fields - Source:", !!sourceFile?.buffer, "TotalBatches:", !!totalBatchesField?.buffer, "UserId:", !!userIdField?.buffer);
-      return res.status(400).json({ error: "Missing required fields: source, totalBatches, userId" });
+    // Validate required fields
+    if (!sourceImage || !totalBatches || !userId) {
+      console.error("[BatchJob] Missing required fields - SourceImage:", !!sourceImage, "TotalBatches:", !!totalBatches, "UserId:", !!userId);
+      return res.status(400).json({ error: "Missing required fields: sourceImage, totalBatches, userId" });
     }
 
-    const totalBatches = parseInt(totalBatchesField.buffer.toString());
-    const userId = parseInt(userIdField.buffer.toString());
+    // Validate and parse numeric fields
+    const parsedTotalBatches = parseInt(totalBatches);
+    const parsedUserId = parseInt(userId);
 
-    if (isNaN(totalBatches) || totalBatches <= 0) {
-      console.error("[BatchJob] Invalid totalBatches value");
+    if (isNaN(parsedTotalBatches) || parsedTotalBatches <= 0) {
+      console.error("[BatchJob] Invalid totalBatches value:", totalBatches);
       return res.status(400).json({ error: "Invalid totalBatches value" });
     }
 
-    if (isNaN(userId) || userId <= 0) {
-      console.error("[BatchJob] Invalid userId value");
+    if (isNaN(parsedUserId) || parsedUserId <= 0) {
+      console.error("[BatchJob] Invalid userId value:", userId);
       return res.status(400).json({ error: "Invalid userId value" });
     }
 
-    // Validate source image
-    if (sourceFile.size > MAX_IMAGE_SIZE) {
-      console.error("[BatchJob] Source image too large");
+    // Validate base64 image data
+    if (typeof sourceImage !== 'string' || !sourceImage.startsWith('data:image/')) {
+      console.error("[BatchJob] Invalid sourceImage format - must be base64 data URL");
+      return res.status(400).json({ error: "Invalid sourceImage format - must be base64 data URL" });
+    }
+
+    // Extract base64 data and decode
+    const base64Data = sourceImage.split(',')[1];
+    if (!base64Data) {
+      console.error("[BatchJob] Invalid base64 data URL format");
+      return res.status(400).json({ error: "Invalid base64 data URL format" });
+    }
+
+    let sourceImageBuffer;
+    try {
+      sourceImageBuffer = Buffer.from(base64Data, 'base64');
+    } catch (error) {
+      console.error("[BatchJob] Failed to decode base64 image data:", error.message);
+      return res.status(400).json({ error: "Failed to decode base64 image data" });
+    }
+
+    // Validate image size
+    if (sourceImageBuffer.length > MAX_IMAGE_SIZE) {
+      console.error("[BatchJob] Source image too large:", sourceImageBuffer.length);
       return res.status(400).json({ 
         error: "Source image size exceeds 5MB limit",
-        details: { sourceSize: sourceFile.size, maxAllowed: MAX_IMAGE_SIZE }
+        details: { sourceSize: sourceImageBuffer.length, maxAllowed: MAX_IMAGE_SIZE }
       });
     }
 
-    if (sourceFile.size < MIN_IMAGE_SIZE) {
-      console.error("[BatchJob] Source image too small");
+    if (sourceImageBuffer.length < MIN_IMAGE_SIZE) {
+      console.error("[BatchJob] Source image too small:", sourceImageBuffer.length);
       return res.status(400).json({ 
         error: "Source image size below minimum threshold",
-        details: { sourceSize: sourceFile.size, minRequired: MIN_IMAGE_SIZE }
+        details: { sourceSize: sourceImageBuffer.length, minRequired: MIN_IMAGE_SIZE }
       });
     }
 
+    // Extract image metadata from data URL
+    const mimeTypeMatch = sourceImage.match(/^data:([^;]+);/);
+    const imageType = mimeTypeMatch ? mimeTypeMatch[1] : 'image/jpeg';
+    const imageName = metadata?.sourceImageName || 'source.jpg';
+
     // Detect faces in source image to validate it
-    const sourceFaces = await detectFacesInImage(sourceFile.buffer, sourceFile.originalname);
+    const sourceFaces = await detectFacesInImage(sourceImageBuffer, imageName);
     
     if (!sourceFaces || sourceFaces.length === 0) {
       console.error("[BatchJob] No faces detected in source image");
       return res.status(400).json({
         error: "No faces detected in source image",
         details: {
-          imageName: sourceFile.originalname,
-          imageSize: sourceFile.size,
-          imageType: sourceFile.mimetype
+          imageName: imageName,
+          imageSize: sourceImageBuffer.length,
+          imageType: imageType
         }
       });
     }
 
     // Create batch job
     const batchJob = batchJobService.createBatchJob(
-      userId, 
-      sourceFile.buffer, 
-      totalBatches,
+      parsedUserId, 
+      sourceImageBuffer, 
+      parsedTotalBatches,
       {
-        sourceImageName: sourceFile.originalname,
-        sourceImageSize: sourceFile.size,
-        sourceImageType: sourceFile.mimetype,
-        sourceFaceCount: sourceFaces.length
+        sourceImageName: imageName,
+        sourceImageSize: sourceImageBuffer.length,
+        sourceImageType: imageType,
+        sourceFaceCount: sourceFaces.length,
+        ...metadata
       }
     );
 
     if (Controls.enableDebugLogBatchJobService) {
-      console.log(`[BatchJob] Created batch job: ${batchJob.id} for user ${userId} with ${totalBatches} batches`);
+      console.log(`[BatchJob] Created batch job: ${batchJob.id} for user ${parsedUserId} with ${parsedTotalBatches} batches`);
     }
 
     res.json({
