@@ -320,13 +320,9 @@ class FaceApiService: FaceApiServiceProtocol {
             }
             
             let decoder = JSONDecoder()
-            // Remove the date decoding strategy since we're handling dates as strings now
-            // decoder.dateDecodingStrategy = .iso8601
+            decoder.dateDecodingStrategy = .iso8601
             
             let creationResponse = try decoder.decode(BatchJobCreationResponse.self, from: data)
-            
-            // Convert string date to Date object for BatchJob
-            let createdAtDate = creationResponse.createdAtDate ?? Date()
             
             // Create BatchJob from response
             let batchJob = BatchJob(
@@ -335,8 +331,8 @@ class FaceApiService: FaceApiServiceProtocol {
                 totalBatches: creationResponse.totalBatches,
                 completedBatches: 0,
                 status: BatchJobStatus(rawValue: creationResponse.status) ?? BatchJobStatus.pending,
-                createdAt: createdAtDate,
-                updatedAt: createdAtDate,
+                createdAt: creationResponse.createdAt,
+                updatedAt: creationResponse.createdAt,
                 metadata: ["sourceFaceCount": "\(creationResponse.sourceFaceCount)"]
             )
             
@@ -502,8 +498,7 @@ class FaceApiService: FaceApiServiceProtocol {
             }
             
             let decoder = JSONDecoder()
-            // Remove the date decoding strategy since we're handling dates as strings now
-            // decoder.dateDecodingStrategy = .iso8601
+            decoder.dateDecodingStrategy = .iso8601
             
             let statusResponse = try decoder.decode(BatchJobStatusResponse.self, from: data)
             
