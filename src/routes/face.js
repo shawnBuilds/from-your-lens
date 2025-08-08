@@ -630,6 +630,7 @@ router.post("/batch-job", async (req, res) => {
     
     if (Controls.enableDebugLogBatchJobService) {
       console.log("[BatchJob] Fields received - SourceImage:", !!sourceImage, "TotalBatches:", !!totalBatches, "UserId:", !!userId);
+      
     }
 
     // Validate required fields
@@ -733,7 +734,7 @@ router.post("/batch-job", async (req, res) => {
       userId: batchJob.userId,
       totalBatches: batchJob.totalBatches,
       status: batchJob.status,
-      createdAt: batchJob.createdAt,
+      createdAt: batchJob.createdAt.toISOString(),
       sourceFaceCount: sourceFaces.length
     });
 
