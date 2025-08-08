@@ -306,8 +306,8 @@ class BatchJobService {
                 totalBatches: job.totalBatches,
                 completedBatches: job.completedBatches,
                 status: job.status,
-                createdAt: job.createdAt.toISOString(),
-                updatedAt: job.updatedAt.toISOString(),
+                createdAt: job.createdAt,
+                updatedAt: job.updatedAt,
                 metadata: job.metadata
             },
             progress: job.getProgressPercentage(),
