@@ -70,7 +70,7 @@ class NotificationService: NotificationServiceProtocol {
         let content = UNMutableNotificationContent()
         content.title = title
         content.body = body
-        content.sound = .default
+        content.sound = nil // Disable sound for notifications
         content.categoryIdentifier = category.rawValue
         
         // Add app icon badge

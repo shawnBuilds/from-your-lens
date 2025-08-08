@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		2937E1032E45F1E800F625B2 /* BatchCompareChunkingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2937E1022E45F1E800F625B2 /* BatchCompareChunkingService.swift */; };
 		294C4C3C2E0AE394004CF461 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 294C4C3B2E0AE394004CF461 /* Assets.xcassets */; };
 		294C4C3F2E0AE394004CF461 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 294C4C3E2E0AE394004CF461 /* Preview Assets.xcassets */; };
 		294C4C492E0AE395004CF461 /* FromYourLensTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 294C4C482E0AE395004CF461 /* FromYourLensTests.swift */; };
@@ -73,6 +74,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		2937E1022E45F1E800F625B2 /* BatchCompareChunkingService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatchCompareChunkingService.swift; sourceTree = "<group>"; };
 		294C4C342E0AE38C004CF461 /* FromYourLens.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FromYourLens.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		294C4C3B2E0AE394004CF461 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		294C4C3E2E0AE394004CF461 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
@@ -223,6 +225,7 @@
 		294C4C8E2E0AE968004CF461 /* services */ = {
 			isa = PBXGroup;
 			children = (
+				2937E1022E45F1E800F625B2 /* BatchCompareChunkingService.swift */,
 				297BA9A62E2ABE530031B541 /* NotificationService.swift */,
 				2965D76C2E295724005F2900 /* KeyboardManager.swift */,
 				2965D7642E25858E005F2900 /* PhotoDownloadService.swift */,
@@ -441,6 +444,7 @@
 				294C4D272E0C705A004CF461 /* PhotoItemView.swift in Sources */,
 				297BA9A92E2AC0CD0031B541 /* NotificationPermissionModal.swift in Sources */,
 				2965D76B2E26EF8B005F2900 /* ShareSheet.swift in Sources */,
+				2937E1032E45F1E800F625B2 /* BatchCompareChunkingService.swift in Sources */,
 				297BA9A72E2ABE530031B541 /* NotificationService.swift in Sources */,
 				294C4C9A2E0AE968004CF461 /* AppState.swift in Sources */,
 				2965D76D2E295725005F2900 /* KeyboardManager.swift in Sources */,

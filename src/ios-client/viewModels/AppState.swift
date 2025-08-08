@@ -37,6 +37,12 @@ class AppState: ObservableObject {
     @Published var selectedSourcePhoto: Photo?
     @Published var selectedTargetPhotos: [Photo] = []
     
+    // MARK: - Chunking State
+    @Published var isChunkingEnabled: Bool = false
+    @Published var chunkingProgress: ChunkingProgress?
+    @Published var currentChunkIndex: Int = 0
+    @Published var totalChunks: Int = 0
+    
     // MARK: - User Search State
     @Published var allUsers: [User] = []
     @Published var isFetchingUsers: Bool = false
@@ -58,6 +64,7 @@ class AppState: ObservableObject {
     private let photosService = PhotosService()
     private let faceApiService = FaceApiService()
     private let photoDownloadService = PhotoDownloadService()
+    private let chunkingService = BatchCompareChunkingService()
     
     // MARK: - Initialization
     init() {
@@ -456,6 +463,12 @@ class AppState: ObservableObject {
         batchCompareError = nil
         batchCompareState = .matching
         
+        // Reset chunking state
+        isChunkingEnabled = false
+        chunkingProgress = nil
+        currentChunkIndex = 0
+        totalChunks = 0
+        
         if FeatureFlags.enableDebugLogFaceDetection {
             print("[AppState] Starting batch compare with \(targetPhotos.count) target photos")
         }
@@ -464,12 +477,62 @@ class AppState: ObservableObject {
             print("[BatchCompareModal] State transition: WAITING → MATCHING")
         }
         
+        // Determine if we should use chunking
+        let shouldUseChunking = targetPhotos.count > ChunkingConfig.maxChunkSize
+        
+        if shouldUseChunking {
+            await performChunkedBatchCompare(sourcePhoto: sourcePhoto, targetPhotos: targetPhotos)
+        } else {
+            await performSingleBatchCompare(sourcePhoto: sourcePhoto, targetPhotos: targetPhotos)
+        }
+        
+        isBatchComparing = false
+    }
+    
+    
+    // MARK: - Chunked Batch Compare
+    private func performChunkedBatchCompare(sourcePhoto: Photo, targetPhotos: [Photo]) async {
+        isChunkingEnabled = true
+        
+        if FeatureFlags.enableDebugLogBatchChunking {
+            print("[AppState] Using chunked batch compare for \(targetPhotos.count) photos")
+        }
+        
+        let results = await chunkingService.processBatchInChunks(
+            sourcePhoto: sourcePhoto,
+            targetPhotos: targetPhotos
+        ) { progress in
+            // Update progress on main thread
+            Task { @MainActor in
+                self.chunkingProgress = progress
+                self.currentChunkIndex = progress.currentChunkIndex
+                self.totalChunks = progress.totalChunks
+                self.batchCompareProgress = progress.overallProgress
+                
+                // Don't update batchCompareResults until all chunks are complete
+                // This prevents UI from updating after each chunk
+                
+                if FeatureFlags.enableDebugLogBatchChunking {
+                    print("[AppState] Chunking progress: \(progress.completedChunks)/\(progress.totalChunks) chunks, \(String(format: "%.1f", progress.overallProgress * 100))%")
+                }
+            }
+        }
+        
+        // Process results only after ALL chunks are complete
+        await processBatchCompareResults(results, targetPhotos: targetPhotos)
+    }
+    
+    // MARK: - Single Batch Compare (Original Logic)
+    private func performSingleBatchCompare(sourcePhoto: Photo, targetPhotos: [Photo]) async {
+        if FeatureFlags.enableDebugLogFaceDetection {
+            print("[AppState] Using single batch compare for \(targetPhotos.count) photos")
+        }
+        
         do {
             // Convert source photo to image data
             guard let sourceImageData = await convertPhotoToImageData(sourcePhoto) else {
                 batchCompareError = "Failed to load source image"
                 batchCompareState = .error
-                isBatchComparing = false
                 return
             }
             
@@ -482,9 +545,9 @@ class AppState: ObservableObject {
                     print("[AppState] 🔍 Converting target \(index + 1)/\(targetPhotos.count): \(targetPhoto.mediaItemId)")
                 }
                 
-                    guard let targetImageData = await convertPhotoToImageData(targetPhoto) else {
-                        if FeatureFlags.enableDebugBatchCompareModal {
-                            print("[BatchCompareModal] Failed to load target image data for: \(targetPhoto.mediaItemId)")
+                guard let targetImageData = await convertPhotoToImageData(targetPhoto) else {
+                    if FeatureFlags.enableDebugBatchCompareModal {
+                        print("[BatchCompareModal] Failed to load target image data for: \(targetPhoto.mediaItemId)")
                     }
                     continue
                 }
@@ -496,17 +559,16 @@ class AppState: ObservableObject {
             guard !targetImageDataArray.isEmpty else {
                 batchCompareError = "Failed to load any target images"
                 batchCompareState = .error
-                isBatchComparing = false
                 return
             }
             
             if FeatureFlags.enableDebugLogFaceDetection {
                 print("[AppState] Prepared \(targetImageDataArray.count) target images for batch processing")
-                    }
-                    
+            }
+            
             // Perform batch face comparison
             let batchResponse = try await faceApiService.batchCompareFacesWithApi(
-                        sourceImageData: sourceImageData,
+                sourceImageData: sourceImageData,
                 targetImageDataArray: targetImageDataArray
             )
             
@@ -519,7 +581,7 @@ class AppState: ObservableObject {
                 let targetPhoto = validTargetPhotos[index]
                 
                 // Create a new BatchCompareResult with the actual photo object
-                    let batchResult = BatchCompareResult(
+                let batchResult = BatchCompareResult(
                     targetFileName: result.targetFileName,
                     photo: targetPhoto, // Use the actual photo instead of placeholder
                     faceMatches: result.faceMatches,
@@ -528,9 +590,9 @@ class AppState: ObservableObject {
                     targetFaceCount: result.targetFaceCount,
                     error: result.error,
                     rejected: result.rejected
-                    )
-                    
-                    allResults.append(batchResult)
+                )
+                
+                allResults.append(batchResult)
             }
             
             // Add error results for photos that couldn't be converted
@@ -550,82 +612,82 @@ class AppState: ObservableObject {
                 }
             }
             
-            batchCompareProgress = 1.0
-            batchCompareResults = allResults
-            
-            if FeatureFlags.enableDebugLogFaceDetection {
-                print("[AppState] Batch compare completed: \(batchResponse.successfulComparisons) successful, \(batchResponse.failedComparisons) failed")
-                print("[AppState] Results breakdown:")
-                for (index, result) in allResults.enumerated() {
-                    print("  [\(index)] \(result.targetFileName): \(result.faceMatches.count) matches, error: \(result.error ?? "none")")
-                }
-            }
-            
-            // Determine state based on results
-            let matchingResults = allResults.filter { !$0.faceMatches.isEmpty }
-            let hasAnyMatches = !matchingResults.isEmpty
-            
-            // Check if there were any actual technical failures (not just "no faces detected")
-            let technicalFailures = allResults.filter { $0.error != nil && $0.error != "No faces detected in target image" }
-            let hasTechnicalFailures = !technicalFailures.isEmpty
-            
-            if hasTechnicalFailures && technicalFailures.count == targetPhotos.count {
-                // All comparisons failed due to technical issues (API errors, network, etc.)
-                batchCompareError = "All \(targetPhotos.count) image comparisons failed"
-                batchCompareState = .error
-                if FeatureFlags.enableDebugBatchCompareModal {
-                    print("[BatchCompareModal] State transition: MATCHING → ERROR (all failed)")
-                }
-            } else if hasTechnicalFailures {
-                // Some comparisons had technical issues, but others succeeded
-                batchCompareError = "\(technicalFailures.count) of \(targetPhotos.count) comparisons had issues"
-                batchCompareState = .matched
-                if FeatureFlags.enableDebugBatchCompareModal {
-                    print("[BatchCompareModal] State transition: MATCHING → MATCHED (partial success)")
-                }
-            } else {
-                // All comparisons completed successfully (regardless of whether matches were found)
-                batchCompareState = .matched
-                if FeatureFlags.enableDebugBatchCompareModal {
-                    if hasAnyMatches {
-                        print("[BatchCompareModal] State transition: MATCHING → MATCHED (found \(matchingResults.count) matches)")
-                    } else {
-                        print("[BatchCompareModal] State transition: MATCHING → MATCHED (no matches found)")
-                    }
-                }
-            }
-            
-            // Send notification for batch compare completion
-            if FeatureFlags.enablePushNotifications {
-                let matchCount = allResults.filter { !$0.faceMatches.isEmpty }.count
-                
-                // Only send notification if app is not in foreground (when feature flag is enabled)
-                let shouldSkipNotification = FeatureFlags.skipBatchCompareNotificationsWhenInForeground && isAppInForeground
-                
-                if !shouldSkipNotification {
-                    if FeatureFlags.enableDebugLogNotifications {
-                        print("[AppState] Sending batch compare notification with \(matchCount) matches")
-                    }
-                    NotificationService.shared.sendBatchCompareCompleteNotification(matchCount: matchCount)
-                } else {
-                    if FeatureFlags.enableDebugLogNotifications {
-                        print("[AppState] App is in foreground, skipping batch compare notification (user will see results directly)")
-                    }
-                }
-            }
+            // Process results
+            await processBatchCompareResults(allResults, targetPhotos: targetPhotos)
             
         } catch {
-            if FeatureFlags.enableDebugLogFaceDetection {
-                print("[AppState] Error during batch compare: \(error)")
-            }
-            batchCompareError = error.localizedDescription
+            batchCompareError = "Batch comparison failed: \(error.localizedDescription)"
             batchCompareState = .error
             if FeatureFlags.enableDebugBatchCompareModal {
                 print("[BatchCompareModal] State transition: MATCHING → ERROR (exception)")
             }
+            print("[AppState] Error during batch compare:", error)
+        }
+    }
+    
+    // MARK: - Process Batch Compare Results
+    private func processBatchCompareResults(_ allResults: [BatchCompareResult], targetPhotos: [Photo]) async {
+        batchCompareProgress = 1.0
+        batchCompareResults = allResults
+        
+        if FeatureFlags.enableDebugLogFaceDetection {
+            let successfulComparisons = allResults.filter { $0.error == nil || $0.error == "No faces detected in target image" }.count
+            let failedComparisons = allResults.filter { $0.error != nil && $0.error != "No faces detected in target image" }.count
+            print("[AppState] Batch compare completed: \(successfulComparisons) successful, \(failedComparisons) failed")
+            print("[AppState] Results breakdown:")
+            for (index, result) in allResults.enumerated() {
+                print("  [\(index)] \(result.targetFileName): \(result.faceMatches.count) matches, error: \(result.error ?? "none")")
+            }
         }
         
-        isBatchComparing = false
+        // Determine state based on results
+        let matchingResults = allResults.filter { !$0.faceMatches.isEmpty }
+        let hasAnyMatches = !matchingResults.isEmpty
+        
+        // Check if there were any actual technical failures (not just "no faces detected")
+        let technicalFailures = allResults.filter { $0.error != nil && $0.error != "No faces detected in target image" }
+        let hasTechnicalFailures = !technicalFailures.isEmpty
+        
+        if hasTechnicalFailures && technicalFailures.count == targetPhotos.count {
+            // All comparisons failed due to technical issues (API errors, network, etc.)
+            batchCompareError = "All \(targetPhotos.count) image comparisons failed"
+            batchCompareState = .error
+            if FeatureFlags.enableDebugBatchCompareModal {
+                print("[BatchCompareModal] State transition: MATCHING → ERROR (all failed)")
+            }
+        } else if hasTechnicalFailures {
+            // Some comparisons had technical issues, but others succeeded
+            batchCompareError = "\(technicalFailures.count) of \(targetPhotos.count) comparisons had issues"
+            batchCompareState = .matched
+            if FeatureFlags.enableDebugBatchCompareModal {
+                print("[BatchCompareModal] State transition: MATCHING → MATCHED (partial success)")
+            }
+        } else {
+            // All comparisons completed successfully (regardless of whether matches were found)
+            batchCompareState = .matched
+            if FeatureFlags.enableDebugBatchCompareModal {
+                if hasAnyMatches {
+                    print("[BatchCompareModal] State transition: MATCHING → MATCHED (found \(matchingResults.count) matches)")
+                } else {
+                    print("[BatchCompareModal] State transition: MATCHING → MATCHED (no matches found)")
+                }
+            }
+        }
+        
+        // Send notification for batch compare completion
+        if FeatureFlags.enablePushNotifications {
+            let matchCount = allResults.filter { !$0.faceMatches.isEmpty }.count
+            
+            // Only send notification if app is not in foreground (when feature flag is enabled)
+            let shouldSkipNotification = FeatureFlags.skipBatchCompareNotificationsWhenInForeground && isAppInForeground
+            
+            if !shouldSkipNotification {
+                if FeatureFlags.enableDebugLogNotifications {
+                    print("[AppState] Sending batch compare notification with \(matchCount) matches")
+                }
+                NotificationService.shared.sendBatchCompareCompleteNotification(matchCount: matchCount)
+            }
+        }
     }
     
     func resetBatchCompare() {
@@ -639,6 +701,12 @@ class AppState: ObservableObject {
         batchCompareState = .waiting
         selectedTargetUser = nil
         batchCompareMode = .findPhotos
+        
+        // Reset chunking state
+        isChunkingEnabled = false
+        chunkingProgress = nil
+        currentChunkIndex = 0
+        totalChunks = 0
     }
     
     // MARK: - User Management Methods
