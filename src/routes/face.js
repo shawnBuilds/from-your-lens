@@ -621,8 +621,6 @@ router.post("/batch-job", upload.fields([
 ]), async (req, res) => {
   if (Controls.enableDebugLogBatchJobService) {
     console.log("[BatchJob] Creating new batch job request");
-    console.log("[BatchJob] Request files:", Object.keys(req.files || {}));
-    console.log("[BatchJob] Request body size:", req.headers['content-length'], "bytes");
   }
   
   try {
@@ -637,16 +635,11 @@ router.post("/batch-job", upload.fields([
     const userIdField = req.files.userId?.[0];
     
     if (Controls.enableDebugLogBatchJobService) {
-      console.log("[BatchJob] Source file:", sourceFile ? `present (${sourceFile.size} bytes)` : "missing");
-      console.log("[BatchJob] TotalBatches field:", totalBatchesField ? `present (${totalBatchesField.buffer.toString()})` : "missing");
-      console.log("[BatchJob] UserId field:", userIdField ? `present (${userIdField.buffer.toString()})` : "missing");
+      console.log("[BatchJob] Fields received - Source:", !!sourceFile, "TotalBatches:", !!totalBatchesField, "UserId:", !!userIdField);
     }
 
     if (!sourceFile?.buffer || !totalBatchesField?.buffer || !userIdField?.buffer) {
-      console.error("[BatchJob] Missing required fields");
-      console.error("[BatchJob] Source file buffer:", !!sourceFile?.buffer);
-      console.error("[BatchJob] TotalBatches buffer:", !!totalBatchesField?.buffer);
-      console.error("[BatchJob] UserId buffer:", !!userIdField?.buffer);
+      console.error("[BatchJob] Missing required fields - Source:", !!sourceFile?.buffer, "TotalBatches:", !!totalBatchesField?.buffer, "UserId:", !!userIdField?.buffer);
       return res.status(400).json({ error: "Missing required fields: source, totalBatches, userId" });
     }
 
