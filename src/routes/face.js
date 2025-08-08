@@ -350,8 +350,7 @@ router.post(
   "/batch-compare",
   upload.fields([
     { name: "source", maxCount: 1 },
-    { name: "targets", maxCount: Controls.maxBatchCompareTargets },
-    { name: "jobId", maxCount: 1 } // Optional: for chunked processing
+    { name: "targets", maxCount: Controls.maxBatchCompareTargets }
   ]),
   async (req, res) => {
     if (Controls.enableDebugLogBatchCompare) {
@@ -368,13 +367,14 @@ router.post(
 
       const sourceFile = req.files.source?.[0];
       const targetFiles = req.files.targets || [];
-      const jobIdField = req.files.jobId?.[0];
-      const jobId = jobIdField ? jobIdField.buffer.toString() : null;
+      // Read jobId from req.body (text field) instead of req.files (file field)
+      const jobId = req.body.jobId || null;
 
       if (Controls.enableDebugLogBatchCompare) {
         console.log("\n[BatchCompare] Request Details:");
         console.log("- Source Image:", sourceFile?.originalname);
         console.log("- Target Images:", targetFiles.length);
+        console.log("- Job ID:", jobId || "None");
         targetFiles.forEach((file, index) => {
           console.log(`  ${index + 1}. ${file.originalname} (${file.size} bytes)`);
         });
