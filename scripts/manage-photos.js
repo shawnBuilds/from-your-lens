@@ -32,16 +32,25 @@ const displayHeader = (title) => {
 
 // Main menu options
 const MAIN_MENU_OPTIONS = [
-    { id: 1, label: 'Browse Users', action: browseUsers },
-    { id: 2, label: 'Exit', action: exit }
+    { id: 1, label: 'Manage Users', action: manageUsers },
+    { id: 2, label: 'Manage Photos', action: managePhotos },
+    { id: 3, label: 'Exit', action: exit }
 ];
 
 // User management menu options
-const USER_MENU_OPTIONS = [
+const USER_MANAGEMENT_OPTIONS = [
+    { id: 1, label: 'Browse All Users', action: browseUsers },
+    { id: 2, label: 'Delete User by ID', action: deleteUserById },
+    { id: 3, label: 'Back to Main Menu', action: showMainMenu }
+];
+
+// User selection menu options
+const USER_SELECTION_OPTIONS = [
     { id: 1, label: 'View User\'s Photos', action: viewUserPhotos },
     { id: 2, label: 'View Photos of This User', action: viewPhotosOfThisUser },
     { id: 3, label: 'Delete User\'s Photo', action: deleteUserPhoto },
-    { id: 4, label: 'Back to Main Menu', action: showMainMenu }
+    { id: 4, label: 'Delete This User', action: deleteCurrentUser },
+    { id: 5, label: 'Back to User Management', action: manageUsers }
 ];
 
 // Photo management menu options
@@ -49,7 +58,14 @@ const PHOTO_MENU_OPTIONS = [
     { id: 1, label: 'Delete This Photo', action: deleteCurrentPhoto },
     { id: 2, label: 'View Next Photo', action: viewNextPhoto },
     { id: 3, label: 'View Previous Photo', action: viewPreviousPhoto },
-    { id: 4, label: 'Back to User Menu', action: showUserMenu }
+    { id: 4, label: 'Back to User Selection', action: showUserSelectionMenu }
+];
+
+// Photo management main options
+const PHOTO_MANAGEMENT_OPTIONS = [
+    { id: 1, label: 'Browse Users for Photo Management', action: browseUsersForPhotos },
+    { id: 2, label: 'Delete Photo by ID', action: deletePhotoById },
+    { id: 3, label: 'Back to Main Menu', action: showMainMenu }
 ];
 
 // Global state
@@ -59,14 +75,14 @@ let currentPhotoIndex = 0;
 
 // Main menu
 async function showMainMenu() {
-    displayHeader('Photo Management Tool');
+    displayHeader('Photo & User Management Tool');
     console.log('Select an option:\n');
     
     MAIN_MENU_OPTIONS.forEach(option => {
         console.log(`  ${option.id}. ${option.label}`);
     });
     
-    const choice = await askQuestion('\nEnter your choice (1-2): ');
+    const choice = await askQuestion('\nEnter your choice (1-3): ');
     const option = MAIN_MENU_OPTIONS.find(opt => opt.id === parseInt(choice));
     
     if (option) {
@@ -74,6 +90,46 @@ async function showMainMenu() {
     } else {
         console.log('❌ Invalid choice. Please try again.');
         await showMainMenu();
+    }
+}
+
+// User management menu
+async function manageUsers() {
+    displayHeader('User Management');
+    console.log('Select an option:\n');
+    
+    USER_MANAGEMENT_OPTIONS.forEach(option => {
+        console.log(`  ${option.id}. ${option.label}`);
+    });
+    
+    const choice = await askQuestion('\nEnter your choice (1-3): ');
+    const option = USER_MANAGEMENT_OPTIONS.find(opt => opt.id === parseInt(choice));
+    
+    if (option) {
+        await option.action();
+    } else {
+        console.log('❌ Invalid choice. Please try again.');
+        await manageUsers();
+    }
+}
+
+// Photo management menu
+async function managePhotos() {
+    displayHeader('Photo Management');
+    console.log('Select an option:\n');
+    
+    PHOTO_MANAGEMENT_OPTIONS.forEach(option => {
+        console.log(`  ${option.id}. ${option.label}`);
+    });
+    
+    const choice = await askQuestion('\nEnter your choice (1-3): ');
+    const option = PHOTO_MANAGEMENT_OPTIONS.find(opt => opt.id === parseInt(choice));
+    
+    if (option) {
+        await option.action();
+    } else {
+        console.log('❌ Invalid choice. Please try again.');
+        await managePhotos();
     }
 }
 
@@ -92,7 +148,7 @@ async function browseUsers() {
         
         if (result.rows.length === 0) {
             console.log('❌ No users found in the database.');
-            await showMainMenu();
+            await manageUsers();
             return;
         }
         
@@ -108,14 +164,14 @@ async function browseUsers() {
         const choice = await askQuestion('Enter user number to manage (or press Enter to go back): ');
         
         if (choice === '') {
-            await showMainMenu();
+            await manageUsers();
             return;
         }
         
         const userIndex = parseInt(choice) - 1;
         if (userIndex >= 0 && userIndex < result.rows.length) {
             currentUser = result.rows[userIndex];
-            await showUserMenu();
+            await showUserSelectionMenu();
         } else {
             console.log('❌ Invalid user number.');
             await browseUsers();
@@ -123,118 +179,199 @@ async function browseUsers() {
         
     } catch (error) {
         console.error('❌ Error browsing users:', error.message);
-        await showMainMenu();
+        await manageUsers();
     }
 }
 
-// View photos of a specific user by ID
-async function viewPhotosOfUser() {
-    displayHeader('View Photos of Specific User');
+// Browse users for photo management
+async function browseUsersForPhotos() {
+    displayHeader('Browse Users for Photo Management');
     
-    const userId = await askQuestion('Enter user ID: ');
+    try {
+        const result = await pool.query(`
+            SELECT id, email, full_name, created_at, 
+                   (SELECT COUNT(*) FROM photos WHERE user_id = users.id) as photo_count,
+                   (SELECT COUNT(*) FROM photos WHERE photo_of = users.id) as photos_of_count
+            FROM users 
+            ORDER BY full_name ASC NULLS LAST, email ASC
+        `);
+        
+        if (result.rows.length === 0) {
+            console.log('❌ No users found in the database.');
+            await managePhotos();
+            return;
+        }
+        
+        console.log(`Found ${result.rows.length} users:\n`);
+        
+        result.rows.forEach((user, index) => {
+            console.log(`${index + 1}. ${user.full_name || 'No name'} (${user.email})`);
+            console.log(`   ID: ${user.id} | Photos uploaded: ${user.photo_count} | Photos of user: ${user.photos_of_count}`);
+            console.log(`   Created: ${new Date(user.created_at).toLocaleDateString()}`);
+            console.log('');
+        });
+        
+        const choice = await askQuestion('Enter user number to manage photos (or press Enter to go back): ');
+        
+        if (choice === '') {
+            await managePhotos();
+            return;
+        }
+        
+        const userIndex = parseInt(choice) - 1;
+        if (userIndex >= 0 && userIndex < result.rows.length) {
+            currentUser = result.rows[userIndex];
+            await showUserSelectionMenu();
+        } else {
+            console.log('❌ Invalid user number.');
+            await browseUsersForPhotos();
+        }
+        
+    } catch (error) {
+        console.error('❌ Error browsing users:', error.message);
+        await managePhotos();
+    }
+}
+
+// Delete user by ID
+async function deleteUserById() {
+    displayHeader('Delete User by ID');
+    
+    const userId = await askQuestion('Enter user ID to delete: ');
     
     if (!userId || isNaN(userId)) {
         console.log('❌ Invalid user ID.');
-        await showMainMenu();
+        await manageUsers();
         return;
     }
     
     try {
-        // First, verify the user exists
-        const userCheck = await pool.query('SELECT id, email, full_name FROM users WHERE id = $1', [userId]);
+        // First, verify the user exists and get their details
+        const userCheck = await pool.query(`
+            SELECT id, email, full_name, created_at,
+                   (SELECT COUNT(*) FROM photos WHERE user_id = users.id) as photo_count,
+                   (SELECT COUNT(*) FROM photos WHERE photo_of = users.id) as photos_of_count
+            FROM users WHERE id = $1
+        `, [userId]);
+        
         if (userCheck.rows.length === 0) {
             console.log(`❌ User ID ${userId} not found in the database.`);
-            await showMainMenu();
+            await manageUsers();
             return;
         }
         
-        currentUser = userCheck.rows[0];
-        await viewPhotosOfThisUser();
+        const user = userCheck.rows[0];
         
-    } catch (error) {
-        console.error('❌ Error viewing photos of user:', error.message);
-        await showMainMenu();
-    }
-}
-
-// Delete photo by ID
-async function deletePhotoById() {
-    displayHeader('Delete Photo by ID');
-    
-    const photoId = await askQuestion('Enter photo ID to delete: ');
-    
-    if (!photoId || isNaN(photoId)) {
-        console.log('❌ Invalid photo ID.');
-        await showMainMenu();
-        return;
-    }
-    
-    try {
-        // Get photo details first
-        const photoResult = await pool.query(`
-            SELECT p.*, u.email as uploaded_by_email, po.email as photo_of_email
-            FROM photos p
-            LEFT JOIN users u ON p.user_id = u.id
-            LEFT JOIN users po ON p.photo_of = po.id
-            WHERE p.id = $1
-        `, [photoId]);
+        console.log('\n👤 User Details:');
+        console.log(`  ID: ${user.id}`);
+        console.log(`  Email: ${user.email}`);
+        console.log(`  Full Name: ${user.full_name || 'Not set'}`);
+        console.log(`  Created: ${new Date(user.created_at).toLocaleString()}`);
+        console.log(`  Photos uploaded: ${user.photo_count}`);
+        console.log(`  Photos of user: ${user.photos_of_count}`);
         
-        if (photoResult.rows.length === 0) {
-            console.log(`❌ Photo ID ${photoId} not found in the database.`);
-            await showMainMenu();
-            return;
+        if (user.photo_count > 0 || user.photos_of_count > 0) {
+            console.log('\n⚠️  WARNING: This user has photos associated with them!');
+            console.log('   Deleting the user will also delete all associated photos.');
         }
         
-        const photo = photoResult.rows[0];
-        
-        console.log('\n📸 Photo Details:');
-        console.log(`  ID: ${photo.id}`);
-        console.log(`  Media Item ID: ${photo.media_item_id}`);
-        console.log(`  Uploaded by: ${photo.uploaded_by_email} (User ID: ${photo.user_id})`);
-        console.log(`  Photo of: ${photo.photo_of_email || 'Not set'} (User ID: ${photo.photo_of || 'Not set'})`);
-        console.log(`  Base URL: ${photo.base_url || 'Not set'}`);
-        console.log(`  Created: ${new Date(photo.created_at).toLocaleString()}`);
-        
-        const confirm = await askQuestion('\n⚠️  Are you sure you want to delete this photo? (yes/no): ');
+        const confirm = await askQuestion('\n⚠️  Are you sure you want to delete this user? (yes/no): ');
         
         if (confirm.toLowerCase() === 'yes' || confirm.toLowerCase() === 'y') {
-            await pool.query('DELETE FROM photos WHERE id = $1', [photoId]);
-            console.log('✅ Photo deleted successfully.');
+            // Delete all photos associated with this user first
+            if (user.photo_count > 0 || user.photos_of_count > 0) {
+                console.log('🗑️  Deleting associated photos...');
+                await pool.query('DELETE FROM photos WHERE user_id = $1 OR photo_of = $1', [userId]);
+                console.log('✅ Associated photos deleted.');
+            }
+            
+            // Delete the user
+            await pool.query('DELETE FROM users WHERE id = $1', [userId]);
+            console.log('✅ User deleted successfully.');
         } else {
             console.log('❌ Deletion cancelled.');
         }
         
-        await showMainMenu();
+        await manageUsers();
         
     } catch (error) {
-        console.error('❌ Error deleting photo:', error.message);
-        await showMainMenu();
+        console.error('❌ Error deleting user:', error.message);
+        await manageUsers();
     }
 }
 
-// User menu
-async function showUserMenu() {
+// User selection menu (for both user and photo management)
+async function showUserSelectionMenu() {
     if (!currentUser) {
         console.log('❌ No user selected.');
-        await showMainMenu();
+        await manageUsers();
         return;
     }
     
     displayHeader(`Manage User: ${currentUser.full_name || 'No name'} (${currentUser.email})`);
     console.log('Select an option:\n');
     
-    USER_MENU_OPTIONS.forEach(option => {
+    USER_SELECTION_OPTIONS.forEach(option => {
         console.log(`  ${option.id}. ${option.label}`);
     });
     
-    const choice = await askQuestion('\nEnter your choice (1-4): ');
-    const option = USER_MENU_OPTIONS.find(opt => opt.id === parseInt(choice));
+    const choice = await askQuestion('\nEnter your choice (1-5): ');
+    const option = USER_SELECTION_OPTIONS.find(opt => opt.id === parseInt(choice));
     
     if (option) {
         await option.action();
     } else {
         console.log('❌ Invalid choice. Please try again.');
-        await showUserMenu();
+        await showUserSelectionMenu();
+    }
+}
+
+// Delete current user
+async function deleteCurrentUser() {
+    if (!currentUser) {
+        console.log('❌ No user selected.');
+        await showUserSelectionMenu();
+        return;
+    }
+    
+    console.log(`\n⚠️  About to delete user: ${currentUser.full_name || currentUser.email}`);
+    console.log(`   Email: ${currentUser.email}`);
+    console.log(`   ID: ${currentUser.id}`);
+    
+    const confirm = await askQuestion('\nAre you sure you want to delete this user? (yes/no): ');
+    
+    if (confirm.toLowerCase() === 'yes' || confirm.toLowerCase() === 'y') {
+        try {
+            // Delete all photos associated with this user first
+            const photoCount = await pool.query(`
+                SELECT COUNT(*) as count 
+                FROM photos 
+                WHERE user_id = $1 OR photo_of = $1
+            `, [currentUser.id]);
+            
+            if (photoCount.rows[0].count > 0) {
+                console.log(`🗑️  Deleting ${photoCount.rows[0].count} associated photos...`);
+                await pool.query('DELETE FROM photos WHERE user_id = $1 OR photo_of = $1', [currentUser.id]);
+                console.log('✅ Associated photos deleted.');
+            }
+            
+            // Delete the user
+            await pool.query('DELETE FROM users WHERE id = $1', [currentUser.id]);
+            console.log('✅ User deleted successfully.');
+            
+            // Reset current user
+            currentUser = null;
+            currentPhotos = [];
+            currentPhotoIndex = 0;
+            
+            await manageUsers();
+        } catch (error) {
+            console.error('❌ Error deleting user:', error.message);
+            await showUserSelectionMenu();
+        }
+    } else {
+        console.log('❌ Deletion cancelled.');
+        await showUserSelectionMenu();
     }
 }
 
@@ -253,7 +390,7 @@ async function viewUserPhotos() {
         
         if (result.rows.length === 0) {
             console.log('❌ No photos found for this user.');
-            await showUserMenu();
+            await showUserSelectionMenu();
             return;
         }
         
@@ -263,7 +400,7 @@ async function viewUserPhotos() {
         
     } catch (error) {
         console.error('❌ Error viewing user photos:', error.message);
-        await showUserMenu();
+        await showUserSelectionMenu();
     }
 }
 
@@ -282,7 +419,7 @@ async function viewPhotosOfThisUser() {
         
         if (result.rows.length === 0) {
             console.log('❌ No photos found of this user.');
-            await showUserMenu();
+            await showUserSelectionMenu();
             return;
         }
         
@@ -292,7 +429,7 @@ async function viewPhotosOfThisUser() {
         
     } catch (error) {
         console.error('❌ Error viewing photos of user:', error.message);
-        await showUserMenu();
+        await showUserSelectionMenu();
     }
 }
 
@@ -300,7 +437,7 @@ async function viewPhotosOfThisUser() {
 async function displayCurrentPhoto() {
     if (currentPhotos.length === 0) {
         console.log('❌ No photos to display.');
-        await showUserMenu();
+        await showUserSelectionMenu();
         return;
     }
     
@@ -360,7 +497,7 @@ async function deleteCurrentPhoto() {
             
             if (currentPhotos.length === 0) {
                 console.log('No more photos to display.');
-                await showUserMenu();
+                await showUserSelectionMenu();
             } else {
                 // Adjust index if we deleted the last photo
                 if (currentPhotoIndex >= currentPhotos.length) {
@@ -408,7 +545,7 @@ async function deleteUserPhoto() {
     
     if (!photoId || isNaN(photoId)) {
         console.log('❌ Invalid photo ID.');
-        await showUserMenu();
+        await showUserSelectionMenu();
         return;
     }
     
@@ -421,7 +558,7 @@ async function deleteUserPhoto() {
         
         if (photoResult.rows.length === 0) {
             console.log(`❌ Photo ID ${photoId} not found or doesn't belong to this user.`);
-            await showUserMenu();
+            await showUserSelectionMenu();
             return;
         }
         
@@ -442,11 +579,66 @@ async function deleteUserPhoto() {
             console.log('❌ Deletion cancelled.');
         }
         
-        await showUserMenu();
+        await showUserSelectionMenu();
         
     } catch (error) {
         console.error('❌ Error deleting photo:', error.message);
-        await showUserMenu();
+        await showUserSelectionMenu();
+    }
+}
+
+// Delete photo by ID
+async function deletePhotoById() {
+    displayHeader('Delete Photo by ID');
+    
+    const photoId = await askQuestion('Enter photo ID to delete: ');
+    
+    if (!photoId || isNaN(photoId)) {
+        console.log('❌ Invalid photo ID.');
+        await managePhotos();
+        return;
+    }
+    
+    try {
+        // Get photo details first
+        const photoResult = await pool.query(`
+            SELECT p.*, u.email as uploaded_by_email, po.email as photo_of_email
+            FROM photos p
+            LEFT JOIN users u ON p.user_id = u.id
+            LEFT JOIN users po ON p.photo_of = po.id
+            WHERE p.id = $1
+        `, [photoId]);
+        
+        if (photoResult.rows.length === 0) {
+            console.log(`❌ Photo ID ${photoId} not found in the database.`);
+            await managePhotos();
+            return;
+        }
+        
+        const photo = photoResult.rows[0];
+        
+        console.log('\n📸 Photo Details:');
+        console.log(`  ID: ${photo.id}`);
+        console.log(`  Media Item ID: ${photo.media_item_id}`);
+        console.log(`  Uploaded by: ${photo.uploaded_by_email} (User ID: ${photo.user_id})`);
+        console.log(`  Photo of: ${photo.photo_of_email || 'Not set'} (User ID: ${photo.photo_of || 'Not set'})`);
+        console.log(`  Base URL: ${photo.base_url || 'Not set'}`);
+        console.log(`  Created: ${new Date(photo.created_at).toLocaleString()}`);
+        
+        const confirm = await askQuestion('\n⚠️  Are you sure you want to delete this photo? (yes/no): ');
+        
+        if (confirm.toLowerCase() === 'yes' || confirm.toLowerCase() === 'y') {
+            await pool.query('DELETE FROM photos WHERE id = $1', [photoId]);
+            console.log('✅ Photo deleted successfully.');
+        } else {
+            console.log('❌ Deletion cancelled.');
+        }
+        
+        await managePhotos();
+        
+    } catch (error) {
+        console.error('❌ Error deleting photo:', error.message);
+        await managePhotos();
     }
 }
 
@@ -469,7 +661,7 @@ process.on('SIGINT', async () => {
 // Main execution
 async function main() {
     try {
-        console.log('🚀 Starting Photo Management Tool...');
+        console.log('🚀 Starting Photo & User Management Tool...');
         await showMainMenu();
     } catch (error) {
         console.error('❌ Fatal error:', error.message);

@@ -108,10 +108,10 @@ struct PhotosView: View {
                 isLoading: selectedTab == .allPhotos ? appState.isFetchingPhotos : appState.isFetchingPhotosOfYou,
                 error: selectedTab == .allPhotos ? appState.fetchPhotosError?.localizedDescription : appState.fetchPhotosOfYouError?.localizedDescription,
                 tabType: selectedTab,
-                loadMore: selectedTab == .allPhotos ? nil : { 
-                    Task { await appState.loadMorePhotosOfUser() }
-                },
-                hasMore: selectedTab == .allPhotos ? appState.hasMorePhotos : appState.hasMorePhotosOfYou,
+                loadMore: selectedTab == .allPhotos ? { 
+                    Task { await appState.loadMorePhotos() }
+                } : nil, // Photos of You tab doesn't use pagination
+                hasMore: selectedTab == .allPhotos ? appState.hasMorePhotos : false, // Photos of You tab always loads all photos
                 emptyMessage: emptyMessage
             )
             

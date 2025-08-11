@@ -686,7 +686,7 @@ struct MatchingStateContent: View {
                     .font(.system(size: 48))
                     .foregroundColor(.primaryColor)
                 
-                Text("This may take a few minutes...")
+                Text("This may take 10 to 15 minutes...")
                     .font(.title2)
                     .fontWeight(.bold)
                     .foregroundColor(.textColorPrimary)
@@ -727,6 +727,7 @@ struct MatchedStateContent: View {
                 Button(action: {
                     Task {
                         await appState.confirmMatches()
+                        // Close modal immediately after confirming matches
                         isPresented = false
                         appState.resetBatchCompare()
                     }

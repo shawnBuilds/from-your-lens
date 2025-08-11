@@ -374,13 +374,15 @@ class AppState: ObservableObject {
         fetchPhotosOfYouError = nil
         
         do {
+            // Load all photos at once instead of using pagination
             let result = try await photosService.fetchPhotosOfUser(userId: String(user.id))
             if FeatureFlags.enableDebugLogServerPhotos {
                 print("[DEBUG][AppState] ✅ Successfully fetched \(result.photos.count) photos of user")
                 print("[DEBUG][AppState] 📊 Result details - Has more: \(result.hasMore), Total: \(result.total ?? 0)")
             }
             photosOfYou = result.photos
-            hasMorePhotosOfYou = result.hasMore
+            // Photos of You tab now loads all photos at once, so no pagination needed
+            hasMorePhotosOfYou = false
             photosOfYouInitialFetchComplete = true
         } catch {
             fetchPhotosOfYouError = error
@@ -393,22 +395,7 @@ class AppState: ObservableObject {
         isFetchingPhotosOfYou = false
     }
     
-    func loadMorePhotosOfUser() async {
-        guard let user = currentUser, hasMorePhotosOfYou, !isFetchingPhotosOfYou else { return }
-        
-        isFetchingPhotosOfYou = true
-        
-        do {
-            let result = try await photosService.loadMorePhotosOfUser(userId: String(user.id), offset: photosOfYou.count)
-            photosOfYou.append(contentsOf: result.photos)
-            hasMorePhotosOfYou = result.hasMore
-        } catch {
-            fetchPhotosOfYouError = error
-            print("[AppState] Error loading more photos of user:", error)
-        }
-        
-        isFetchingPhotosOfYou = false
-    }
+    // loadMorePhotosOfUser function removed - Photos of You tab now loads all photos at once
     
     func updateSinglePhotoMetadata(_ photo: Photo) async {
         do {
@@ -843,9 +830,17 @@ class AppState: ObservableObject {
             }
         }
         
-        // If this is send photos mode, upload photos to S3
+        // If this is send photos mode, start S3 upload in background (don't await)
         if batchCompareMode == .sendPhotos && !matchingResults.isEmpty {
-            await uploadMatchedPhotosToS3(matchingResults: matchingResults, sharedWithUserId: targetUserId)
+            if FeatureFlags.enableDebugLogPhotoUpload {
+                print("[AppState] Starting background S3 upload for \(matchingResults.count) photos to user \(targetUserId)")
+            }
+            Task {
+                await uploadMatchedPhotosToS3(matchingResults: matchingResults, sharedWithUserId: targetUserId)
+                if FeatureFlags.enableDebugLogPhotoUpload {
+                    print("[AppState] Background S3 upload completed for user \(targetUserId)")
+                }
+            }
         }
         
         if FeatureFlags.enableDebugLogFaceDetection {

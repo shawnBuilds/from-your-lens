@@ -39,7 +39,8 @@ struct PhotoGalleryView: View {
                         }
                         .padding(.horizontal, horizontalPadding)
                         .padding(.vertical, spacing)
-                        if hasMore, let loadMore = loadMore {
+                        // Only show "Load More" button for tabs that support pagination
+                        if hasMore, let loadMore = loadMore, tabType == .allPhotos {
                             Button(action: loadMore) {
                                 if isLoading {
                                     ProgressView()
