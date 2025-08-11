@@ -4,6 +4,7 @@ struct PhotoGalleryView: View {
     let photos: [Photo]
     let isLoading: Bool
     let error: String?
+    let tabType: PhotoTabType
     var loadMore: (() -> Void)? = nil
     var hasMore: Bool = false
     var emptyMessage: String? = nil
@@ -32,7 +33,7 @@ struct PhotoGalleryView: View {
                     ScrollView {
                         LazyVGrid(columns: columns, spacing: spacing) {
                             ForEach(photos) { photo in
-                                PhotoItemView(photo: photo, cellSize: cellSize)
+                                PhotoItemView(photo: photo, cellSize: cellSize, tabType: tabType)
                                     .environmentObject(appState)
                             }
                         }
@@ -53,6 +54,7 @@ struct PhotoGalleryView: View {
                 }
                 .onAppear {
                     if FeatureFlags.enableDebugLogPhotoGallery && !didLog {
+                        print("[DEBUG][PhotoGallery] Tab: \(tabType.rawValue)")
                         print("[DEBUG][PhotoGallery] User: \(String(describing: appState.currentUser))")
                         print("[DEBUG][PhotoGallery] Photo count: \(photos.count)")
                         
@@ -60,7 +62,7 @@ struct PhotoGalleryView: View {
                         let photosToLog = Array(photos.prefix(10))
                         print("[DEBUG][PhotoGallery] First \(photosToLog.count) photos:")
                         for (index, photo) in photosToLog.enumerated() {
-                            print("[DEBUG][PhotoGallery] Photo \(index): id=\(photo.id), mediaItemId=\(photo.mediaItemId), url=\(photo.baseUrl)")
+                            print("[DEBUG][PhotoGallery] Photo \(index): id=\(photo.id), mediaItemId=\(photo.mediaItemId), url=\(photo.baseUrl), s3Url=\(photo.s3Url ?? "nil")")
                         }
                         
                         // Check for duplicate IDs
@@ -84,6 +86,7 @@ struct PhotoGalleryView: View {
         photos: Photo.mockPhotos,
         isLoading: false,
         error: nil,
+        tabType: .allPhotos,
         loadMore: {},
         hasMore: true,
         emptyMessage: "No photos yet. Upload some memories!"

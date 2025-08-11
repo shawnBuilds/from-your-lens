@@ -64,21 +64,24 @@ struct InviteFriendsModal: View {
                         
                         // Share button
                         Button(action: {
-                            showingShareSheet = true
+                            if FeatureFlags.enableInviteFriendsShare {
+                                showingShareSheet = true
+                            }
                         }) {
                             HStack {
                                 Image(systemName: "square.and.arrow.up")
                                     .font(.system(size: 18, weight: .semibold))
-                                Text("Share App")
+                                Text(FeatureFlags.enableInviteFriendsShare ? "Share App" : "Share App (Coming Soon)")
                                     .font(.system(size: 18, weight: .semibold))
                             }
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 16)
-                            .background(Color.primaryColor)
+                            .background(FeatureFlags.enableInviteFriendsShare ? Color.primaryColor : Color.gray)
                             .foregroundColor(.white)
                             .clipShape(RoundedRectangle(cornerRadius: 22))
                             .shadow(color: Color.neumorphicShadow.opacity(0.18), radius: 4, x: 0, y: 2)
                         }
+                        .disabled(!FeatureFlags.enableInviteFriendsShare)
                         .padding(.horizontal, 24)
                     }
                 }

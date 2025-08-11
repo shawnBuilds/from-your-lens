@@ -4,13 +4,14 @@ import Photos
 struct PhotoItemView: View {
     let photo: Photo
     let cellSize: CGFloat
+    let tabType: PhotoTabType
     @EnvironmentObject var appState: AppState
     
     var body: some View {
         ZStack {
-            if let s3Url = photo.s3Url, !s3Url.isEmpty {
-                // Handle S3 photos (shared photos)
-                let _ = print("[PhotoItemView] 📸 Using S3 URL: \(s3Url)")
+            if let s3Url = photo.s3Url, !s3Url.isEmpty && tabType == .photosOfYou {
+                // Handle S3 photos (shared photos) - ONLY for "Photos of You" tab
+                let _ = print("[PhotoItemView] 📸 Using S3 URL for Photos of You tab: \(s3Url)")
                 AsyncImage(url: URL(string: s3Url)) { phase in
                     switch phase {
                     case .empty:
@@ -46,7 +47,8 @@ struct PhotoItemView: View {
                 // Handle iCloud photos
                 ICloudPhotoView(photo: photo, cellSize: cellSize)
             } else {
-                // Handle regular network photos
+                // Handle regular network photos (including original photos, not S3 versions)
+                let _ = print("[PhotoItemView] 📸 Using original URL for \(tabType.rawValue) tab: \(photo.baseUrl)")
                 AsyncImage(url: URL(string: photo.baseUrl)) { phase in
                     switch phase {
                     case .empty:
@@ -83,9 +85,9 @@ struct PhotoItemView: View {
         .frame(width: cellSize, height: cellSize)
         .accessibilityLabel(photo.altText ?? "Photo")
         .overlay(
-            // Download button for S3 photos
+            // Download button for S3 photos - ONLY for "Photos of You" tab
             Group {
-                if let s3Url = photo.s3Url, !s3Url.isEmpty {
+                if let s3Url = photo.s3Url, !s3Url.isEmpty && tabType == .photosOfYou {
                     VStack {
                         Spacer()
                         HStack {
@@ -186,5 +188,5 @@ struct ICloudPhotoView: View {
 }
 
 #Preview {
-    PhotoItemView(photo: Photo.mock, cellSize: 140)
+    PhotoItemView(photo: Photo.mock, cellSize: 140, tabType: .photosOfYou)
 } 

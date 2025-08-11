@@ -107,6 +107,7 @@ struct PhotosView: View {
                 photos: filteredPhotos,
                 isLoading: selectedTab == .allPhotos ? appState.isFetchingPhotos : appState.isFetchingPhotosOfYou,
                 error: selectedTab == .allPhotos ? appState.fetchPhotosError?.localizedDescription : appState.fetchPhotosOfYouError?.localizedDescription,
+                tabType: selectedTab,
                 loadMore: selectedTab == .allPhotos ? nil : { 
                     Task { await appState.loadMorePhotosOfUser() }
                 },

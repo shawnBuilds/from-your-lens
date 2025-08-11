@@ -5,13 +5,14 @@ struct FeatureFlags {
     // MARK: - Feature/Behavior Flags
     static let enableFaceDetectionOnImageLoad = false
     static let showFaceCountBadge = false
-    static let defaultBatchTargetCount = 60
+    static let defaultBatchTargetCount = 40
+    static let defaultICloudPhotoCount = 40 // Default number of photos to fetch from iCloud
+    static let maxTargetPhotoSelection = 40 // Maximum number of target photos that can be selected for batch comparison (increased for testing)
     static let enableGoogleDriveUsage = false
     static let enableSkipAuthFlow = false // Set to true to enable the "skip auth" modal for development
     static let enableLandingGalleryImages = true // Toggle gallery images section in LandingView
     static let enableLandingHowItWorks = true // Toggle how it works section in LandingView
     static let enableICloudPhotoUsage = true // Enable iCloud photo fetching
-    static let defaultICloudPhotoCount = 60 // Default number of photos to fetch from iCloud
     static let enableServerPhotoUsage = true // Enable server API for photos of user
     static let enableTestUserWithICloudPhotos = false // Use test user with real iCloud photos instead of mock data
     static let enableFaceDetectionUsage = true // Master switch for fa`ce detection functionality
@@ -24,9 +25,9 @@ struct FeatureFlags {
     static let enableAutoProfilePicturePrompt = true // Auto-show PFP picker for users without profile pictures
     static let enableUpdateFilteredUsersInSearch = true // Debug: enable/disable filtering in UserSearchModal
     static let maxSourcePhotoSelection = 1 // Maximum number of source photos that can be selected
-    static let maxTargetPhotoSelection = 60 // Maximum number of target photos that can be selected for batch comparison (increased for testing)
     static let showCompareModalOnFindPhotosClick = false // Show batch compare modal when "Find Photos" is clicked
     static let inviteAppLink = "https://testflight.apple.com/join/INVITE_CODE_TODO" // Placeholder TestFlight link for invite sharing
+    static let enableInviteFriendsShare = false // Enable/disable the share functionality in invite friends modal
 
     // MARK: - Debug Logging Flags
     static let enableDebugLogSkipAuth = false // Debug: log state changes for skip auth/test data

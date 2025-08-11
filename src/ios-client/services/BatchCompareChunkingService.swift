@@ -2,7 +2,7 @@ import Foundation
 
 // MARK: - Chunking Configuration
 struct ChunkingConfig {
-    static let maxChunkSize = 25 // Process 25 images per request (safe for server memory)
+    static let maxChunkSize = 10// Process 25 images per request (safe for server memory)
     static let maxConcurrentChunks = 1 // Sequential processing to avoid overwhelming server
     static let retryAttempts = 2 // Retry failed chunks
     static let retryDelaySeconds = 2.0 // Wait between retries
